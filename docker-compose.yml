@@ -1,0 +1,197 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: vmledger-postgres
+    environment:
+      POSTGRES_USER: vmledger
+      POSTGRES_PASSWORD: vmledger_dev_password
+      POSTGRES_DB: vmledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vmledger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vmledger-network
+
+  # Redis Cache and Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: vmledger-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vmledger-network
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vmledger-api
+    environment:
+      # Application Settings
+      APP_NAME: VMLedger
+      APP_VERSION: 1.0.0
+      DEBUG: "True"
+      LOG_LEVEL: INFO
+      
+      # API Settings
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://vmledger:vmledger_dev_password@postgres:5432/vmledger
+      DATABASE_POOL_SIZE: 5
+      DATABASE_MAX_OVERFLOW: 20
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Security Settings
+      SECRET_KEY: dev-secret-key-change-in-production
+      ENCRYPTION_MASTER_KEY: dev-encryption-key-change-in-production
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 24
+      
+      # Monitoring Settings
+      PING_INTERVAL_SECONDS: 60
+      METRICS_INTERVAL_SECONDS: 300
+      ALERT_COOLDOWN_MINUTES: 15
+      CONCURRENT_WORKERS: 10
+      
+      # SSH Settings
+      SSH_CONNECTION_TIMEOUT: 10
+      SSH_COMMAND_TIMEOUT: 30
+      SSH_MAX_RETRIES: 3
+      
+      # CORS Settings
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+      CORS_ALLOW_CREDENTIALS: "True"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - .:/app  # Mount source code for development hot-reload
+    command: uvicorn vmledger.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - vmledger-network
+    restart: unless-stopped
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vmledger-celery-worker
+    environment:
+      # Application Settings
+      APP_NAME: VMLedger
+      APP_VERSION: 1.0.0
+      DEBUG: "True"
+      LOG_LEVEL: INFO
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://vmledger:vmledger_dev_password@postgres:5432/vmledger
+      DATABASE_POOL_SIZE: 5
+      DATABASE_MAX_OVERFLOW: 20
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Security Settings
+      SECRET_KEY: dev-secret-key-change-in-production
+      ENCRYPTION_MASTER_KEY: dev-encryption-key-change-in-production
+      
+      # Monitoring Settings
+      PING_INTERVAL_SECONDS: 60
+      METRICS_INTERVAL_SECONDS: 300
+      ALERT_COOLDOWN_MINUTES: 15
+      CONCURRENT_WORKERS: 10
+      
+      # SSH Settings
+      SSH_CONNECTION_TIMEOUT: 10
+      SSH_COMMAND_TIMEOUT: 30
+      SSH_MAX_RETRIES: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - .:/app  # Mount source code for development
+    command: celery -A vmledger.celery_app worker --loglevel=info --concurrency=10
+    networks:
+      - vmledger-network
+    restart: unless-stopped
+
+  # Celery Beat Scheduler
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vmledger-celery-beat
+    environment:
+      # Application Settings
+      APP_NAME: VMLedger
+      APP_VERSION: 1.0.0
+      DEBUG: "True"
+      LOG_LEVEL: INFO
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://vmledger:vmledger_dev_password@postgres:5432/vmledger
+      DATABASE_POOL_SIZE: 5
+      DATABASE_MAX_OVERFLOW: 20
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Security Settings
+      SECRET_KEY: dev-secret-key-change-in-production
+      ENCRYPTION_MASTER_KEY: dev-encryption-key-change-in-production
+      
+      # Monitoring Settings
+      PING_INTERVAL_SECONDS: 60
+      METRICS_INTERVAL_SECONDS: 300
+      ALERT_COOLDOWN_MINUTES: 15
+      CONCURRENT_WORKERS: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+      - .:/app  # Mount source code for development
+    command: celery -A vmledger.celery_app beat --loglevel=info
+    networks:
+      - vmledger-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  vmledger-network:
+    driver: bridge
