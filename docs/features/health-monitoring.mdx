@@ -1,0 +1,751 @@
+---
+title: 'Health Monitoring'
+description: 'Real-time VM health checks and resource metrics collection'
+icon: 'heart-pulse'
+---
+
+## Overview
+
+Health Monitoring is VMLedger's continuous surveillance system that watches your VMs 24/7. It combines two powerful monitoring techniques:
+1. **Health Checks** - Quick connectivity tests every 60 seconds
+2. **Metrics Collection** - Detailed resource usage every 5 minutes
+
+<Info>
+**Real-World Analogy**: Think of health monitoring like a hospital's patient monitoring system. The heart rate monitor (health checks) beeps every second to confirm the patient is alive, while the nurse (metrics collection) comes by every few minutes to check temperature, blood pressure, and other vitals.
+</Info>
+
+## Monitoring Architecture
+
+```mermaid
+graph TB
+    subgraph "VMLedger Server"
+        Beat[Celery Beat<br/>Scheduler]
+        Queue[Redis Queue]
+        Worker1[Worker 1]
+        Worker2[Worker 2]
+        Worker3[Worker 3]
+        DB[(PostgreSQL<br/>Database)]
+    end
+    
+    subgraph "Your VMs"
+        VM1[VM 1<br/>192.168.1.100]
+        VM2[VM 2<br/>192.168.1.101]
+        VM3[VM 3<br/>192.168.1.102]
+    end
+    
+    Beat -->|Every 60s| Queue
+    Beat -->|Every 300s| Queue
+    Queue --> Worker1
+    Queue --> Worker2
+    Queue --> Worker3
+    
+    Worker1 -->|ICMP Ping| VM1
+    Worker1 -->|TCP Check| VM1
+    Worker2 -->|SSH Metrics| VM2
+    Worker3 -->|SSH Metrics| VM3
+    
+    Worker1 --> DB
+    Worker2 --> DB
+    Worker3 --> DB
+    
+    style Beat fill:#3b82f6
+    style Queue fill:#f59e0b
+    style Worker1 fill:#10b981
+    style Worker2 fill:#10b981
+    style Worker3 fill:#10b981
+    style DB fill:#8b5cf6
+```
+
+## Health Checks (Custom Ping)
+
+Health checks verify that your VMs are reachable using a two-step process:
+
+### How It Works
+
+```mermaid
+sequenceDiagram
+    participant Worker as Celery Worker
+    participant VM as Your VM
+    participant DB as Database
+    participant Alert as Alert System
+    
+    Note over Worker: Every 60 seconds
+    Worker->>VM: 1. ICMP Ping
+    VM-->>Worker: Pong! (5ms)
+    Worker->>VM: 2. TCP Connect (port 22)
+    VM-->>Worker: Connection accepted
+    
+    Worker->>Worker: Both checks passed ✅
+    Worker->>DB: Store result (success, 5ms)
+    
+    alt VM Unreachable
+        Worker->>VM: 1. ICMP Ping
+        VM--xWorker: Timeout ❌
+        Worker->>VM: 2. TCP Connect
+        VM--xWorker: Connection refused ❌
+        Worker->>Worker: Both checks failed ❌
+        Worker->>DB: Store result (failed, TIMEOUT)
+        Worker->>Alert: Trigger alert
+    end
+```
+
+### Check Components
+
+<CardGroup cols={2}>
+  <Card title="ICMP Ping" icon="signal">
+    Tests network-level connectivity using ICMP echo request/reply
+    
+    **What it checks:**
+    - VM is powered on
+    - Network route exists
+    - Firewall allows ICMP
+    
+    **Timeout:** 5 seconds
+  </Card>
+  
+  <Card title="TCP Port Check" icon="door-open">
+    Tests application-level connectivity by connecting to SSH port
+    
+    **What it checks:**
+    - SSH service is running
+    - Port is accessible
+    - Firewall allows SSH
+    
+    **Timeout:** 5 seconds
+  </Card>
+</CardGroup>
+
+### Health Check Results
+
+```mermaid
+stateDiagram-v2
+    [*] --> Unknown: VM registered
+    Unknown --> Healthy: Both checks pass
+    Healthy --> Healthy: Checks continue passing
+    Healthy --> Degraded: ICMP passes, TCP fails
+    Healthy --> Unreachable: Both checks fail
+    
+    Degraded --> Healthy: TCP recovers
+    Degraded --> Unreachable: ICMP also fails
+    
+    Unreachable --> Degraded: ICMP recovers
+    Unreachable --> Healthy: Both recover
+    
+    Unreachable --> [*]: VM deleted
+```
+
+### Error Types
+
+<AccordionGroup>
+  <Accordion title="ICMP_TIMEOUT" icon="clock">
+    **Meaning:** ICMP ping packet was sent but no response received within 5 seconds.
+    
+    **Common Causes:**
+    - VM is powered off
+    - Network route doesn't exist
+    - Firewall blocks ICMP
+    - VM is overloaded and can't respond
+    
+    **Troubleshooting:**
+    ```bash
+    # Test ping manually
+    ping -c 4 192.168.1.100
+    
+    # Check if VM is powered on (if you have access to hypervisor)
+    # For VMware:
+    vim-cmd vmsvc/power.getstate <vm-id>
+    
+    # For VirtualBox:
+    VBoxManage showvminfo "VM Name" | grep State
+    ```
+  </Accordion>
+  
+  <Accordion title="TCP_REFUSED" icon="ban">
+    **Meaning:** TCP connection to SSH port was actively refused.
+    
+    **Common Causes:**
+    - SSH service is not running
+    - SSH is listening on different port
+    - Firewall blocks the port
+    
+    **Troubleshooting:**
+    ```bash
+    # Test TCP connection manually
+    nc -zv 192.168.1.100 22
+    
+    # Check if SSH is running (if you have console access)
+    systemctl status sshd
+    
+    # Check which port SSH is listening on
+    ss -tlnp | grep sshd
+    ```
+  </Accordion>
+  
+  <Accordion title="HOST_UNREACHABLE" icon="route">
+    **Meaning:** Network routing failed—no route to host.
+    
+    **Common Causes:**
+    - VM's network interface is down
+    - Network switch/router is down
+    - IP address changed
+    - VLAN misconfiguration
+    
+    **Troubleshooting:**
+    ```bash
+    # Check routing table
+    ip route get 192.168.1.100
+    
+    # Trace route to VM
+    traceroute 192.168.1.100
+    
+    # Check ARP table
+    arp -a | grep 192.168.1.100
+    ```
+  </Accordion>
+  
+  <Accordion title="TIMEOUT" icon="hourglass">
+    **Meaning:** Both ICMP and TCP checks timed out.
+    
+    **Common Causes:**
+    - VM is completely unreachable
+    - Network is down
+    - VM is severely overloaded
+    
+    **Troubleshooting:**
+    ```bash
+    # Check if other VMs on same network are reachable
+    ping 192.168.1.1  # Gateway
+    ping 192.168.1.101  # Another VM
+    
+    # Check VMLedger server's network
+    ip addr show
+    ip route show
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Metrics Collection
+
+Metrics collection gathers detailed resource usage data via SSH:
+
+### Collected Metrics
+
+<CardGroup cols={3}>
+  <Card title="CPU Usage" icon="microchip">
+    **What:** Percentage of CPU in use
+    
+    **Range:** 0% to 100%
+    
+    **Example:** 45.2% means CPU is 45% busy
+  </Card>
+  
+  <Card title="RAM Usage" icon="memory">
+    **What:** Memory used vs total
+    
+    **Units:** Megabytes (MB)
+    
+    **Example:** 2048 MB used / 4096 MB total
+  </Card>
+  
+  <Card title="Disk Usage" icon="hard-drive">
+    **What:** Disk space used vs total
+    
+    **Units:** Gigabytes (GB) and percentage
+    
+    **Example:** 67.5 GB used / 100 GB total (67.5%)
+  </Card>
+</CardGroup>
+
+### Collection Process
+
+```mermaid
+sequenceDiagram
+    participant Worker as Celery Worker
+    participant DB as Database
+    participant Crypto as Encryption
+    participant VM as Your VM
+    
+    Note over Worker: Every 5 minutes
+    Worker->>DB: Get VM credentials
+    DB-->>Worker: Encrypted SSH key
+    Worker->>Crypto: Decrypt credentials
+    Crypto-->>Worker: Plain SSH key
+    
+    Worker->>VM: SSH Connect
+    VM-->>Worker: Connection established
+    
+    Worker->>VM: Execute: uname -s
+    VM-->>Worker: Linux
+    
+    Worker->>VM: Execute: top -bn1 | grep "Cpu(s)"
+    VM-->>Worker: Cpu(s): 45.2%us, 2.1%sy...
+    
+    Worker->>VM: Execute: free -m
+    VM-->>Worker: Mem: 4096 2048 2048...
+    
+    Worker->>VM: Execute: df -h /
+    VM-->>Worker: /dev/sda1 100G 67.5G...
+    
+    Worker->>VM: SSH Disconnect
+    Worker->>DB: Store metrics
+    Worker->>Crypto: Securely erase SSH key from memory
+```
+
+### SSH Commands by OS
+
+VMLedger automatically detects the operating system and uses appropriate commands:
+
+<Tabs>
+  <Tab title="Linux">
+    ```bash
+    # OS Detection
+    uname -s  # Returns: Linux
+    
+    # CPU Usage
+    top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1
+    # Example output: 45.2
+    
+    # RAM Usage
+    free -m | grep Mem | awk '{print $3,$2}'
+    # Example output: 2048 4096
+    
+    # Disk Usage
+    df -h / | tail -1 | awk '{print $3,$2,$5}'
+    # Example output: 67.5G 100G 68%
+    ```
+  </Tab>
+  
+  <Tab title="macOS">
+    ```bash
+    # OS Detection
+    uname -s  # Returns: Darwin
+    
+    # CPU Usage
+    top -l 1 | grep "CPU usage" | awk '{print $3}' | cut -d'%' -f1
+    # Example output: 45.2
+    
+    # RAM Usage
+    vm_stat | awk '/Pages active/ {active=$3} /Pages wired/ {wired=$4} END {print (active+wired)*4096/1048576}'
+    # Example output: 2048
+    
+    # Disk Usage
+    df -h / | tail -1 | awk '{print $3,$2,$5}'
+    # Example output: 67.5Gi 100Gi 68%
+    ```
+  </Tab>
+  
+  <Tab title="BSD">
+    ```bash
+    # OS Detection
+    uname -s  # Returns: FreeBSD
+    
+    # CPU Usage
+    top -d 1 | grep "CPU" | awk '{print $2}' | cut -d'%' -f1
+    # Example output: 45.2
+    
+    # RAM Usage
+    sysctl hw.physmem hw.usermem | awk '{sum+=$2} END {print sum/1048576}'
+    # Example output: 2048
+    
+    # Disk Usage
+    df -h / | tail -1 | awk '{print $3,$2,$5}'
+    # Example output: 67.5G 100G 68%
+    ```
+  </Tab>
+</Tabs>
+
+### Metric History
+
+VMLedger stores the last **1000 metric data points** per VM:
+
+```bash
+# Get metric history
+curl http://localhost:8000/api/vms/123/metrics \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1001,
+      "vm_id": 123,
+      "timestamp": "2026-05-08T10:30:00Z",
+      "cpu_usage_percent": 45.2,
+      "ram_used_mb": 2048,
+      "ram_total_mb": 4096,
+      "disk_used_gb": 67.5,
+      "disk_total_gb": 100.0,
+      "disk_usage_percent": 67.5,
+      "collection_success": true,
+      "error_message": null
+    }
+  ]
+}
+```
+
+## Monitoring Intervals
+
+<CardGroup cols={2}>
+  <Card title="Health Checks" icon="clock">
+    **Default:** Every 60 seconds
+    
+    **Configurable:** Yes (via `PING_INTERVAL` env var)
+    
+    **Recommended:** 30-120 seconds
+  </Card>
+  
+  <Card title="Metrics Collection" icon="clock">
+    **Default:** Every 300 seconds (5 minutes)
+    
+    **Configurable:** Yes (via `METRICS_INTERVAL` env var)
+    
+    **Recommended:** 180-600 seconds
+  </Card>
+</CardGroup>
+
+### Configuring Intervals
+
+```bash
+# In .env file
+PING_INTERVAL=60          # Health checks every 60 seconds
+METRICS_INTERVAL=300      # Metrics every 5 minutes
+```
+
+<Warning>
+**Performance Impact**: Shorter intervals provide more real-time data but increase:
+- Database storage requirements
+- Network traffic
+- CPU usage on VMLedger server
+- SSH connections to VMs
+
+For 50+ VMs, keep intervals at default values or longer.
+</Warning>
+
+## Concurrent Monitoring
+
+VMLedger uses **10 concurrent workers** by default to monitor multiple VMs simultaneously:
+
+```mermaid
+gantt
+    title Monitoring 50 VMs with 10 Workers
+    dateFormat mm:ss
+    axisFormat %M:%S
+    
+    section Worker 1
+    VM 1-5     :00:00, 30s
+    VM 11-15   :00:30, 30s
+    
+    section Worker 2
+    VM 6-10    :00:00, 30s
+    VM 16-20   :00:30, 30s
+    
+    section Worker 3-10
+    VM 21-50   :00:00, 60s
+    
+    section Complete
+    All Done   :milestone, 01:00, 0s
+```
+
+**Performance Characteristics:**
+- **50 VMs**: Complete cycle in ~60 seconds
+- **100 VMs**: Complete cycle in ~120 seconds
+- **200 VMs**: Complete cycle in ~240 seconds
+
+### Scaling Workers
+
+```bash
+# In docker-compose.yml
+services:
+  celery-worker:
+    command: celery -A vmledger.celery_app worker --concurrency=20
+    #                                                            ^^
+    #                                                    Increase to 20 workers
+```
+
+## Dashboard Visualization
+
+The dashboard shows real-time monitoring data:
+
+### VM Status Indicators
+
+```mermaid
+flowchart LR
+    A[VM Status] --> B{is_reachable?}
+    B -->|true| C[🟢 Green<br/>Healthy]
+    B -->|false| D[🔴 Red<br/>Unreachable]
+    B -->|null| E[⚪ Gray<br/>Unknown]
+    
+    style C fill:#22c55e
+    style D fill:#ef4444
+    style E fill:#9ca3af
+```
+
+### Metrics Display
+
+```json
+{
+  "hostname": "web-server-01",
+  "ip_address": "192.168.1.100",
+  "is_reachable": true,
+  "last_seen": "2026-05-08T10:35:00Z",
+  "latest_cpu": 45.2,
+  "latest_ram_used": 2048,
+  "latest_ram_total": 4096,
+  "latest_disk_percent": 67.5
+}
+```
+
+**Dashboard Display:**
+```
+┌─────────────────────────────────────────┐
+│ 🟢 web-server-01 (192.168.1.100)       │
+├─────────────────────────────────────────┤
+│ CPU:  45.2% ████████░░░░░░░░░░░░        │
+│ RAM:  50.0% (2048 MB / 4096 MB)         │
+│ Disk: 67.5% ██████████████░░░░░░        │
+│                                         │
+│ Last seen: 2 minutes ago                │
+└─────────────────────────────────────────┘
+```
+
+### Auto-Refresh
+
+The dashboard automatically refreshes every **30 seconds** without page reload:
+
+```javascript
+// Frontend code (React Query)
+const { data: vms } = useQuery({
+  queryKey: ['vms'],
+  queryFn: fetchVMs,
+  refetchInterval: 30000  // 30 seconds
+});
+```
+
+## Data Retention
+
+VMLedger automatically cleans up old monitoring data:
+
+<CardGroup cols={2}>
+  <Card title="Ping Results" icon="broom">
+    **Retention:** Last 100 results per VM
+    
+    **Cleanup:** Daily at 2 AM
+    
+    **Storage:** ~10 KB per VM
+  </Card>
+  
+  <Card title="Metrics" icon="broom">
+    **Retention:** Last 1000 data points per VM
+    
+    **Cleanup:** Daily at 2 AM
+    
+    **Storage:** ~100 KB per VM
+  </Card>
+</CardGroup>
+
+### Cleanup Process
+
+```mermaid
+flowchart TD
+    A[Daily at 2 AM] --> B[Cleanup Task Starts]
+    B --> C{For each VM}
+    C --> D[Count ping results]
+    D --> E{More than 100?}
+    E -->|Yes| F[Delete oldest results]
+    E -->|No| G[Skip]
+    F --> H[Count metrics]
+    G --> H
+    H --> I{More than 1000?}
+    I -->|Yes| J[Delete oldest metrics]
+    I -->|No| K[Skip]
+    J --> L[Next VM]
+    K --> L
+    L --> C
+    C -->|Done| M[Cleanup Complete]
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Health Checks Not Running" icon="circle-xmark">
+    **Symptom:** `last_seen` stays `null` or doesn't update
+    
+    **Possible Causes:**
+    1. Celery Beat not running
+    2. Celery workers not running
+    3. Redis connection failed
+    
+    **Troubleshooting:**
+    ```bash
+    # Check Celery Beat status
+    docker ps | grep celery-beat
+    docker logs vmledger-celery-beat
+    
+    # Check Celery workers status
+    docker ps | grep celery-worker
+    docker logs vmledger-celery-worker
+    
+    # Check Redis connection
+    docker exec vmledger-redis redis-cli ping
+    # Should return: PONG
+    
+    # Check scheduled tasks
+    docker exec vmledger-celery-beat celery -A vmledger.celery_app inspect scheduled
+    ```
+  </Accordion>
+  
+  <Accordion title="Metrics Collection Failing" icon="chart-line-down">
+    **Symptom:** `latest_cpu`, `latest_ram_used` stay `null`
+    
+    **Possible Causes:**
+    1. SSH authentication failed
+    2. SSH commands not found on VM
+    3. SSH user lacks permissions
+    4. Firewall blocks SSH
+    
+    **Troubleshooting:**
+    ```bash
+    # Check metric collection errors
+    curl http://localhost:8000/api/vms/123/metrics \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      | jq '.data[] | select(.collection_success == false)'
+    
+    # Test SSH connection manually
+    ssh -i ~/.ssh/vmledger_key root@192.168.1.100
+    
+    # Test commands manually
+    ssh root@192.168.1.100 "top -bn1 | grep 'Cpu(s)'"
+    ssh root@192.168.1.100 "free -m"
+    ssh root@192.168.1.100 "df -h /"
+    
+    # Check Celery worker logs
+    docker logs vmledger-celery-worker | grep "SSH"
+    ```
+  </Accordion>
+  
+  <Accordion title="Slow Monitoring Cycles" icon="hourglass">
+    **Symptom:** Monitoring takes longer than expected
+    
+    **Possible Causes:**
+    1. Too many VMs for current worker count
+    2. SSH connections timing out
+    3. VMs responding slowly
+    
+    **Troubleshooting:**
+    ```bash
+    # Check monitoring cycle time
+    docker logs vmledger-celery-worker | grep "Task.*succeeded"
+    
+    # Increase worker concurrency
+    # Edit docker-compose.yml:
+    services:
+      celery-worker:
+        command: celery -A vmledger.celery_app worker --concurrency=20
+    
+    # Restart workers
+    docker-compose restart celery-worker
+    
+    # Check VM response times
+    curl http://localhost:8000/api/vms/123/ping \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      | jq '.data[] | {timestamp, response_time_ms}'
+    ```
+  </Accordion>
+  
+  <Accordion title="High Database Storage" icon="database">
+    **Symptom:** PostgreSQL database growing too large
+    
+    **Possible Causes:**
+    1. Too many VMs
+    2. Retention limits too high
+    3. Cleanup task not running
+    
+    **Troubleshooting:**
+    ```bash
+    # Check database size
+    docker exec vmledger-postgres psql -U vmledger -c "
+      SELECT pg_size_pretty(pg_database_size('vmledger'));
+    "
+    
+    # Check table sizes
+    docker exec vmledger-postgres psql -U vmledger -c "
+      SELECT 
+        tablename,
+        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
+      FROM pg_tables
+      WHERE schemaname = 'public'
+      ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+    "
+    
+    # Manually run cleanup
+    docker exec vmledger-api python -c "
+      from vmledger.tasks import cleanup_historical_data
+      cleanup_historical_data.delay()
+    "
+    
+    # Check cleanup task schedule
+    docker exec vmledger-celery-beat celery -A vmledger.celery_app inspect scheduled
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Monitor Critical VMs More Frequently" icon="gauge-high">
+    For production VMs, use shorter intervals:
+    ```bash
+    PING_INTERVAL=30  # Every 30 seconds
+    METRICS_INTERVAL=180  # Every 3 minutes
+    ```
+  </Card>
+  
+  <Card title="Use Longer Intervals for Many VMs" icon="gauge-low">
+    For 100+ VMs, use longer intervals:
+    ```bash
+    PING_INTERVAL=120  # Every 2 minutes
+    METRICS_INTERVAL=600  # Every 10 minutes
+    ```
+  </Card>
+  
+  <Card title="Scale Workers with VM Count" icon="users">
+    Rule of thumb: 1 worker per 5-10 VMs
+    ```bash
+    # For 50 VMs: 10 workers (default)
+    # For 100 VMs: 20 workers
+    # For 200 VMs: 40 workers
+    ```
+  </Card>
+  
+  <Card title="Monitor Worker Performance" icon="chart-line">
+    Regularly check worker logs for slow tasks:
+    ```bash
+    docker logs vmledger-celery-worker \
+      | grep "Task.*succeeded" \
+      | grep -E "runtime=[0-9]{2,}"
+    ```
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Alerting" icon="bell" href="/features/alerting">
+    Set up alerts to get notified when VMs go down
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/monitoring">
+    Complete API documentation for monitoring endpoints
+  </Card>
+  
+  <Card title="Dashboard" icon="gauge" href="/guides/dashboard-usage">
+    Learn how to use the monitoring dashboard
+  </Card>
+  
+  <Card title="Performance Tuning" icon="sliders" href="/guides/performance-tuning">
+    Optimize monitoring for large VM fleets
+  </Card>
+</CardGroup>

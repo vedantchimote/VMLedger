@@ -1,0 +1,689 @@
+---
+title: 'Authentication & Security'
+description: 'Understanding VMLedger security and authentication'
+---
+
+## What is Authentication?
+
+**Authentication** is the process of verifying who you are. In VMLedger, authentication ensures that only authorized users can access their VM data.
+
+<Info>
+  Think of authentication like showing your ID at a building entrance. You prove who you are before being allowed inside.
+</Info>
+
+## Authentication Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Browser
+    participant API
+    participant Database
+    participant Redis
+    
+    User->>Browser: Enter username & password
+    Browser->>API: POST /api/auth/login
+    
+    API->>API: Check rate limit
+    
+    alt Rate limit exceeded
+        API-->>Browser: 429 Too Many Requests
+        Browser-->>User: "Too many attempts, try later"
+    else Within rate limit
+        API->>Database: Find user by username
+        Database-->>API: User record
+        
+        API->>API: Verify password (bcrypt)
+        
+        alt Password correct
+            API->>API: Generate JWT token
+            API->>Redis: Store token (24h TTL)
+            API-->>Browser: 200 OK + token
+            Browser->>Browser: Save token in localStorage
+            Browser-->>User: Redirect to dashboard
+        else Password incorrect
+            API->>Database: Increment failed attempts
+            API->>Redis: Increment rate limit counter
+            
+            alt 5th failed attempt
+                API->>Database: Lock account (30 min)
+                API-->>Browser: 401 Account Locked
+            else < 5 attempts
+                API-->>Browser: 401 Invalid Credentials
+            end
+        end
+    end
+```
+
+## Security Features
+
+### 1. Password Security
+
+```mermaid
+graph TB
+    A[User Password] --> B[Password Requirements]
+    B --> C[Minimum 12 characters]
+    B --> D[Uppercase letter]
+    B --> E[Lowercase letter]
+    B --> F[Number]
+    B --> G[Special character]
+    
+    A --> H[Hashing Process]
+    H --> I[Bcrypt Algorithm]
+    I --> J[Cost Factor: 12]
+    J --> K[Hashed Password]
+    K --> L[Stored in Database]
+    
+    style A fill:#2196F3,color:#fff
+    style I fill:#4CAF50,color:#fff
+    style K fill:#FF9800,color:#fff
+    style L fill:#9C27B0,color:#fff
+```
+
+<AccordionGroup>
+  <Accordion title="What is Password Hashing?">
+    **Password hashing** converts your password into a scrambled string that cannot be reversed.
+    
+    **Example**:
+    - Your password: `MySecurePass123!`
+    - Hashed (stored): `$2b$12$KIXxKj8N9yGmP7vQx...`
+    
+    **Why it's secure**:
+    - Even if someone steals the database, they can't read your password
+    - Each password produces a unique hash
+    - The process cannot be reversed
+  </Accordion>
+  
+  <Accordion title="What is Bcrypt?">
+    **Bcrypt** is a password hashing algorithm designed to be slow.
+    
+    **Why slow is good**:
+    - Makes brute-force attacks impractical
+    - Cost factor 12 means ~250ms to hash one password
+    - Attacker would need years to try millions of passwords
+    
+    **Cost Factor**:
+    - Higher number = slower = more secure
+    - VMLedger uses cost factor 12 (industry standard)
+  </Accordion>
+  
+  <Accordion title="Password Requirements">
+    Your password must meet these requirements:
+    
+    | Requirement | Example | Why? |
+    |-------------|---------|------|
+    | 12+ characters | `MyPassword123!` | Longer = harder to guess |
+    | Uppercase | `M`, `P` | Increases combinations |
+    | Lowercase | `y`, `a`, `s` | Increases combinations |
+    | Number | `1`, `2`, `3` | Increases combinations |
+    | Special char | `!`, `@`, `#` | Increases combinations |
+    | Max 72 bytes | ASCII chars | Bcrypt limitation |
+    
+    **Good passwords**:
+    - `SecurePass123!`
+    - `MyVMLedger2026!`
+    - `Infrastructure#99`
+    
+    **Bad passwords**:
+    - `password` (too short, no variety)
+    - `12345678` (no letters)
+    - `abcdefgh` (no numbers/special chars)
+  </Accordion>
+</AccordionGroup>
+
+### 2. JWT Tokens
+
+**JWT (JSON Web Token)** is like a temporary digital ID card.
+
+```mermaid
+graph LR
+    A[Login Success] --> B[Generate JWT]
+    B --> C[Token Structure]
+    
+    C --> D[Header<br/>Algorithm: HS256]
+    C --> E[Payload<br/>User ID, Username<br/>Expiry: 24h]
+    C --> F[Signature<br/>Secret Key]
+    
+    G[Every API Request] --> H[Include Token]
+    H --> I[Verify Signature]
+    I --> J{Valid?}
+    J -->|Yes| K[Process Request]
+    J -->|No| L[Return 401 Error]
+    
+    style B fill:#4CAF50,color:#fff
+    style I fill:#2196F3,color:#fff
+    style K fill:#4CAF50,color:#fff
+    style L fill:#F44336,color:#fff
+```
+
+**Token Lifecycle**:
+
+<Steps>
+  <Step title="Token Creation">
+    When you log in successfully:
+    - Server generates a JWT token
+    - Token contains your user ID and username
+    - Token is signed with a secret key
+    - Token expires in 24 hours
+  </Step>
+  
+  <Step title="Token Storage">
+    Your browser stores the token:
+    - Saved in localStorage
+    - Included in every API request
+    - Sent in Authorization header
+  </Step>
+  
+  <Step title="Token Validation">
+    On every request:
+    - Server checks token signature
+    - Server verifies token hasn't expired
+    - Server checks token hasn't been invalidated (logout)
+  </Step>
+  
+  <Step title="Token Expiry">
+    After 24 hours:
+    - Token becomes invalid
+    - You must log in again
+    - This is a security feature
+  </Step>
+</Steps>
+
+**Token Format**:
+```
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+This is three parts separated by dots:
+1. **Header**: Algorithm and token type
+2. **Payload**: Your user data
+3. **Signature**: Verification code
+
+### 3. Rate Limiting
+
+**Rate limiting** prevents brute-force attacks by limiting login attempts.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Normal: User attempts login
+    Normal --> Attempt1: Failed (1/5)
+    Attempt1 --> Attempt2: Failed (2/5)
+    Attempt2 --> Attempt3: Failed (3/5)
+    Attempt3 --> Attempt4: Failed (4/5)
+    Attempt4 --> Locked: Failed (5/5)
+    
+    Attempt1 --> Normal: Success
+    Attempt2 --> Normal: Success
+    Attempt3 --> Normal: Success
+    Attempt4 --> Normal: Success
+    
+    Locked --> Normal: Wait 30 minutes
+    
+    note right of Locked
+        Account locked for 30 minutes
+        after 5 failed attempts
+    end note
+```
+
+**How it works**:
+
+<Tabs>
+  <Tab title="Normal Usage">
+    **Scenario**: You mistype your password
+    
+    1. Attempt 1: Wrong password → "Invalid credentials"
+    2. Attempt 2: Wrong password → "Invalid credentials"
+    3. Attempt 3: Correct password → Login successful ✓
+    4. Counter resets to 0
+  </Tab>
+  
+  <Tab title="Brute Force Attack">
+    **Scenario**: Attacker tries to guess password
+    
+    1. Attempts 1-4: Wrong passwords → "Invalid credentials"
+    2. Attempt 5: Wrong password → Account locked for 30 minutes
+    3. Attacker must wait 30 minutes before trying again
+    4. Makes brute-force attacks impractical
+  </Tab>
+  
+  <Tab title="Account Lockout">
+    **What happens when locked**:
+    - All login attempts rejected
+    - Error message: "Account locked, try again in X minutes"
+    - Automatic unlock after 30 minutes
+    - Counter resets after unlock
+    
+    **If you're locked out**:
+    - Wait 30 minutes
+    - Or contact administrator to unlock
+    - Use "Forgot Password" feature (if available)
+  </Tab>
+</Tabs>
+
+**Rate Limit Details**:
+- **Window**: 15 minutes
+- **Max Attempts**: 5 failed logins
+- **Lockout Duration**: 30 minutes
+- **Storage**: Redis (fast, temporary)
+
+### 4. Session Management
+
+```mermaid
+graph TB
+    A[User Logs In] --> B[Token Created]
+    B --> C[Token Stored in Redis]
+    C --> D[24-Hour TTL Set]
+    
+    E[User Makes Request] --> F[Token Sent in Header]
+    F --> G{Token in Redis?}
+    G -->|Yes| H{Expired?}
+    G -->|No| I[401 Unauthorized]
+    
+    H -->|No| J[Process Request]
+    H -->|Yes| I
+    
+    K[User Logs Out] --> L[Token Removed from Redis]
+    L --> M[Token Invalidated]
+    
+    N[24 Hours Pass] --> O[Redis Auto-Deletes Token]
+    O --> M
+    
+    style B fill:#4CAF50,color:#fff
+    style C fill:#2196F3,color:#fff
+    style J fill:#4CAF50,color:#fff
+    style I fill:#F44336,color:#fff
+    style M fill:#FF9800,color:#fff
+```
+
+**Session Features**:
+
+<CardGroup cols={2}>
+  <Card title="Token Refresh" icon="rotate">
+    Extend your session without re-logging in
+    
+    **How**: Call `/api/auth/refresh` with current token
+    **Result**: New token with fresh 24-hour expiry
+  </Card>
+  
+  <Card title="Logout" icon="right-from-bracket">
+    Invalidate your token immediately
+    
+    **How**: Call `/api/auth/logout`
+    **Result**: Token removed from Redis, cannot be used again
+  </Card>
+  
+  <Card title="Auto-Expiry" icon="clock">
+    Tokens automatically expire after 24 hours
+    
+    **Why**: Security best practice
+    **Result**: Must log in again after 24 hours
+  </Card>
+  
+  <Card title="Token Validation" icon="shield-check">
+    Every request validates the token
+    
+    **Checks**: Signature, expiry, not logged out
+    **Result**: Request allowed or denied
+  </Card>
+</CardGroup>
+
+## User Registration
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Browser
+    participant API
+    participant Validator
+    participant Database
+    
+    User->>Browser: Fill registration form
+    Browser->>Browser: Validate password (client-side)
+    Browser->>API: POST /api/auth/register
+    
+    API->>Validator: Check password complexity
+    
+    alt Password too weak
+        Validator-->>API: Validation error
+        API-->>Browser: 400 Bad Request
+        Browser-->>User: Show requirements
+    else Password strong enough
+        Validator-->>API: Valid
+        
+        API->>Database: Check username exists
+        
+        alt Username taken
+            Database-->>API: User found
+            API-->>Browser: 400 Username exists
+        else Username available
+            Database-->>API: Not found
+            
+            API->>API: Hash password (bcrypt)
+            API->>API: Generate encryption salt
+            API->>Database: Create user record
+            Database-->>API: User created
+            
+            API->>API: Generate JWT token
+            API-->>Browser: 201 Created + token
+            Browser-->>User: Redirect to dashboard
+        end
+    end
+```
+
+**Registration Process**:
+
+<Steps>
+  <Step title="Choose Username">
+    Pick a unique username
+    - 3-50 characters
+    - Letters, numbers, underscores
+    - Case-sensitive
+  </Step>
+  
+  <Step title="Enter Email">
+    Provide a valid email address
+    - Used for account recovery (future)
+    - Must be unique
+    - Format: user@domain.com
+  </Step>
+  
+  <Step title="Create Password">
+    Choose a strong password
+    - See password requirements above
+    - Frontend shows strength indicator
+    - Must meet all complexity rules
+  </Step>
+  
+  <Step title="Confirm Password">
+    Re-enter password to confirm
+    - Must match exactly
+    - Prevents typos
+  </Step>
+  
+  <Step title="Submit">
+    Click "Create Account"
+    - Password is hashed
+    - User record created
+    - Automatic login with JWT token
+  </Step>
+</Steps>
+
+## Security Best Practices
+
+### For Users
+
+<AccordionGroup>
+  <Accordion title="Use Strong, Unique Passwords">
+    **Do**:
+    - Use a password manager
+    - Create unique password for VMLedger
+    - Use 15+ characters if possible
+    - Mix letters, numbers, symbols
+    
+    **Don't**:
+    - Reuse passwords from other sites
+    - Use personal information (name, birthday)
+    - Share your password
+    - Write password on paper
+  </Accordion>
+  
+  <Accordion title="Protect Your Session">
+    **Do**:
+    - Log out when done
+    - Don't share your computer while logged in
+    - Use HTTPS (production)
+    - Clear browser cache on shared computers
+    
+    **Don't**:
+    - Leave browser open and unattended
+    - Log in on public/untrusted computers
+    - Share your session token
+  </Accordion>
+  
+  <Accordion title="Monitor Your Account">
+    **Watch for**:
+    - Unexpected lockouts (someone trying to access)
+    - VMs you didn't create
+    - Changes you didn't make
+    
+    **If suspicious**:
+    - Change password immediately
+    - Check recent activity
+    - Contact administrator
+  </Accordion>
+</AccordionGroup>
+
+### For Administrators
+
+<AccordionGroup>
+  <Accordion title="Secure the Secret Key">
+    The `SECRET_KEY` environment variable is critical:
+    - Used to sign JWT tokens
+    - Must be random and long (32+ characters)
+    - Never commit to version control
+    - Rotate periodically (every 90 days)
+    - Different key per environment
+    
+    **Generate secure key**:
+    ```bash
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
+    ```
+  </Accordion>
+  
+  <Accordion title="Enable HTTPS">
+    In production:
+    - Always use HTTPS (TLS 1.3)
+    - Enable HSTS headers
+    - Use valid SSL certificate
+    - Redirect HTTP to HTTPS
+    
+    **Why**: Prevents token interception
+  </Accordion>
+  
+  <Accordion title="Monitor Authentication">
+    Watch for:
+    - Multiple failed login attempts
+    - Unusual login times/locations
+    - Account lockouts
+    - Token validation failures
+    
+    **Set up alerts** for suspicious activity
+  </Accordion>
+  
+  <Accordion title="Regular Security Audits">
+    Periodically:
+    - Review user accounts
+    - Check for inactive accounts
+    - Audit authentication logs
+    - Update dependencies
+    - Rotate secret keys
+  </Accordion>
+</AccordionGroup>
+
+## API Authentication
+
+### Using JWT Tokens
+
+```mermaid
+graph LR
+    A[Get Token] --> B[Login Request]
+    B --> C[Receive Token]
+    
+    D[Use Token] --> E[Add to Header]
+    E --> F[Authorization: Bearer TOKEN]
+    
+    G[Token Expires] --> H[Refresh Token]
+    H --> I[Get New Token]
+    
+    J[Done] --> K[Logout]
+    K --> L[Token Invalidated]
+    
+    style C fill:#4CAF50,color:#fff
+    style F fill:#2196F3,color:#fff
+    style I fill:#FF9800,color:#fff
+    style L fill:#F44336,color:#fff
+```
+
+**Example API Calls**:
+
+<CodeGroup>
+```bash cURL
+# 1. Login and get token
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"SecurePass123!"}'
+
+# Response:
+# {"success":true,"data":{"token":"eyJhbGci..."}}
+
+# 2. Use token in requests
+curl -X GET http://localhost:8000/api/vms \
+  -H "Authorization: Bearer eyJhbGci..."
+
+# 3. Refresh token
+curl -X POST http://localhost:8000/api/auth/refresh \
+  -H "Authorization: Bearer eyJhbGci..."
+
+# 4. Logout
+curl -X POST http://localhost:8000/api/auth/logout \
+  -H "Authorization: Bearer eyJhbGci..."
+```
+
+```python Python
+import requests
+
+# 1. Login
+response = requests.post(
+    "http://localhost:8000/api/auth/login",
+    json={"username": "admin", "password": "SecurePass123!"}
+)
+token = response.json()["data"]["token"]
+
+# 2. Use token
+headers = {"Authorization": f"Bearer {token}"}
+response = requests.get(
+    "http://localhost:8000/api/vms",
+    headers=headers
+)
+
+# 3. Refresh token
+response = requests.post(
+    "http://localhost:8000/api/auth/refresh",
+    headers=headers
+)
+new_token = response.json()["data"]["token"]
+
+# 4. Logout
+requests.post(
+    "http://localhost:8000/api/auth/logout",
+    headers=headers
+)
+```
+
+```javascript JavaScript
+// 1. Login
+const loginResponse = await fetch('http://localhost:8000/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username: 'admin',
+    password: 'SecurePass123!'
+  })
+});
+const { data } = await loginResponse.json();
+const token = data.token;
+
+// 2. Use token
+const vmsResponse = await fetch('http://localhost:8000/api/vms', {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+// 3. Refresh token
+const refreshResponse = await fetch('http://localhost:8000/api/auth/refresh', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+const newToken = (await refreshResponse.json()).data.token;
+
+// 4. Logout
+await fetch('http://localhost:8000/api/auth/logout', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+```
+</CodeGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot login - Invalid credentials">
+    **Possible causes**:
+    1. Wrong username or password
+    2. Account locked (too many attempts)
+    3. Account disabled
+    
+    **Solutions**:
+    - Double-check username (case-sensitive)
+    - Verify password (check Caps Lock)
+    - Wait 30 minutes if locked
+    - Contact administrator if account disabled
+  </Accordion>
+  
+  <Accordion title="Token expired error">
+    **Cause**: Your session expired (24 hours passed)
+    
+    **Solution**:
+    - Log in again
+    - Or use token refresh before expiry
+    
+    **Prevention**:
+    - Implement automatic token refresh in your app
+    - Refresh token every 23 hours
+  </Accordion>
+  
+  <Accordion title="401 Unauthorized on API calls">
+    **Possible causes**:
+    1. Missing Authorization header
+    2. Invalid token format
+    3. Token expired
+    4. Token invalidated (logged out)
+    
+    **Solutions**:
+    - Check header format: `Authorization: Bearer TOKEN`
+    - Verify token is not expired
+    - Log in again to get new token
+  </Accordion>
+  
+  <Accordion title="Account locked">
+    **Cause**: 5 failed login attempts within 15 minutes
+    
+    **Solutions**:
+    - Wait 30 minutes for automatic unlock
+    - Contact administrator for manual unlock
+    - Check for unauthorized access attempts
+    
+    **Prevention**:
+    - Use password manager to avoid typos
+    - Enable two-factor authentication (future feature)
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="code" href="/api-reference/authentication">
+    Complete authentication API documentation
+  </Card>
+  
+  <Card title="Security Guide" icon="shield" href="/architecture/security">
+    Deep dive into security architecture
+  </Card>
+  
+  <Card title="User Management" icon="users" href="/guides/user-management">
+    Managing users and permissions
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/development/troubleshooting">
+    Common authentication issues
+  </Card>
+</CardGroup>

@@ -1,0 +1,776 @@
+---
+title: 'VM Management'
+description: 'Complete guide to managing your virtual machine inventory in VMLedger'
+icon: 'server'
+---
+
+## Overview
+
+VM Management is the foundation of VMLedger—it's where you register, organize, update, and track all your virtual machines. Think of it as your VM address book, but with superpowers like automatic health monitoring, metric collection, and deployment tracking.
+
+<Info>
+**Real-World Analogy**: Imagine managing a fleet of delivery trucks. You need to know where each truck is, what it's carrying, when it was last serviced, and how to contact the driver. VM Management does the same for your virtual machines—tracking location (IP), purpose (tags), configuration (deployment notes), and health status.
+</Info>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="VM Registration" icon="plus">
+    Add VMs with IP address, hostname, SSH credentials, and custom tags
+  </Card>
+  
+  <Card title="Credential Security" icon="lock">
+    SSH keys and passwords encrypted with AES-256 before storage
+  </Card>
+  
+  <Card title="Deployment Notes" icon="file-lines">
+    Document installed software and configurations using Markdown
+  </Card>
+  
+  <Card title="Tag Organization" icon="tags">
+    Organize VMs with custom tags (production, staging, web-server, etc.)
+  </Card>
+  
+  <Card title="Bulk Operations" icon="layer-group">
+    Update or delete multiple VMs at once
+  </Card>
+  
+  <Card title="Search & Filter" icon="magnifying-glass">
+    Find VMs instantly by IP, hostname, tags, or deployment notes
+  </Card>
+</CardGroup>
+
+## VM Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Registration: Add VM
+    Registration --> Active: Credentials validated
+    Active --> Monitoring: Health checks start
+    Monitoring --> Active: VM reachable
+    Monitoring --> Unreachable: Ping fails
+    Unreachable --> Active: VM recovers
+    Active --> Updating: Edit VM details
+    Updating --> Active: Changes saved
+    Active --> Deletion: Remove VM
+    Deletion --> [*]: All data deleted
+```
+
+## Registering a VM
+
+### Step 1: Gather VM Information
+
+Before registering, collect these details:
+
+<AccordionGroup>
+  <Accordion title="Required Information" icon="circle-check">
+    - **IP Address**: IPv4 (e.g., `192.168.1.100`) or IPv6 (e.g., `2001:db8::1`)
+    - **Hostname**: Friendly name (e.g., `web-server-01`)
+    - **SSH Port**: Usually `22`, but can be custom (e.g., `2222`)
+    - **SSH Credentials**: Either SSH private key OR password
+    - **SSH Username**: Usually `root` or your admin user
+  </Accordion>
+  
+  <Accordion title="Optional Information" icon="circle-plus">
+    - **Domain**: Full domain name (e.g., `web-server-01.example.com`)
+    - **Tags**: Categories for organization (e.g., `production`, `web-server`, `nginx`)
+    - **Deployment Notes**: Markdown documentation of installed software
+  </Accordion>
+</AccordionGroup>
+
+### Step 2: Register via API
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost:8000/api/vms \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ip_address": "192.168.1.100",
+    "hostname": "web-server-01",
+    "domain": "web-server-01.example.com",
+    "ssh_port": 22,
+    "ssh_username": "root",
+    "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+    "tags": ["production", "web-server", "nginx"],
+    "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24\n- Node.js 20.x\n- PM2 5.x"
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/api/vms",
+    headers={"Authorization": "Bearer YOUR_TOKEN"},
+    json={
+        "ip_address": "192.168.1.100",
+        "hostname": "web-server-01",
+        "domain": "web-server-01.example.com",
+        "ssh_port": 22,
+        "ssh_username": "root",
+        "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+        "tags": ["production", "web-server", "nginx"],
+        "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24\n- Node.js 20.x\n- PM2 5.x"
+    }
+)
+
+vm = response.json()
+print(f"VM registered with ID: {vm['data']['id']}")
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/api/vms', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    ip_address: '192.168.1.100',
+    hostname: 'web-server-01',
+    domain: 'web-server-01.example.com',
+    ssh_port: 22,
+    ssh_username: 'root',
+    ssh_private_key: '-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----',
+    tags: ['production', 'web-server', 'nginx'],
+    deployment_notes: '# Web Server\n\n## Installed Software\n- Nginx 1.24\n- Node.js 20.x\n- PM2 5.x'
+  })
+});
+
+const vm = await response.json();
+console.log(`VM registered with ID: ${vm.data.id}`);
+```
+
+</CodeGroup>
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "ip_address": "192.168.1.100",
+    "hostname": "web-server-01",
+    "domain": "web-server-01.example.com",
+    "ssh_port": 22,
+    "tags": ["production", "web-server", "nginx"],
+    "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24\n- Node.js 20.x\n- PM2 5.x",
+    "created_at": "2026-05-08T10:30:00Z",
+    "updated_at": "2026-05-08T10:30:00Z",
+    "last_seen": null,
+    "is_reachable": null
+  },
+  "timestamp": "2026-05-08T10:30:00Z"
+}
+```
+
+### Step 3: Verify Registration
+
+After registration, VMLedger automatically:
+1. ✅ Encrypts your SSH credentials with AES-256
+2. ✅ Starts health check monitoring (every 60 seconds)
+3. ✅ Schedules metric collection (every 5 minutes)
+4. ✅ Indexes VM for full-text search
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant API
+    participant DB as Database
+    participant Crypto as Encryption
+    participant Monitor as Background Worker
+    
+    You->>API: POST /api/vms
+    API->>API: Validate input
+    API->>Crypto: Encrypt SSH credentials
+    Crypto-->>API: Encrypted credentials
+    API->>DB: Store VM + encrypted creds
+    DB-->>API: VM ID: 123
+    API->>Monitor: Schedule monitoring
+    Monitor-->>API: Tasks queued
+    API-->>You: VM registered (ID: 123)
+    
+    Note over Monitor: 60 seconds later...
+    Monitor->>Monitor: Execute ping check
+    Monitor->>DB: Store ping result
+    
+    Note over Monitor: 5 minutes later...
+    Monitor->>Monitor: Collect metrics via SSH
+    Monitor->>DB: Store metrics
+```
+
+## Listing VMs
+
+### Get All Your VMs
+
+<CodeGroup>
+
+```bash cURL
+curl http://localhost:8000/api/vms \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "http://localhost:8000/api/vms",
+    headers={"Authorization": "Bearer YOUR_TOKEN"}
+)
+
+vms = response.json()
+for vm in vms['data']:
+    print(f"{vm['hostname']} ({vm['ip_address']}) - {vm['is_reachable']}")
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/api/vms', {
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN'
+  }
+});
+
+const vms = await response.json();
+vms.data.forEach(vm => {
+  console.log(`${vm.hostname} (${vm.ip_address}) - ${vm.is_reachable}`);
+});
+```
+
+</CodeGroup>
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "ip_address": "192.168.1.100",
+      "hostname": "web-server-01",
+      "domain": "web-server-01.example.com",
+      "ssh_port": 22,
+      "tags": ["production", "web-server", "nginx"],
+      "deployment_notes": "# Web Server...",
+      "created_at": "2026-05-08T10:30:00Z",
+      "updated_at": "2026-05-08T10:30:00Z",
+      "last_seen": "2026-05-08T10:35:00Z",
+      "is_reachable": true,
+      "latest_cpu": 45.2,
+      "latest_ram_used": 2048,
+      "latest_ram_total": 4096,
+      "latest_disk_percent": 67.5
+    }
+  ],
+  "timestamp": "2026-05-08T10:36:00Z"
+}
+```
+
+### Filter by Tags
+
+```bash
+# Get all production web servers
+curl "http://localhost:8000/api/vms?tags=production,web-server" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Pagination
+
+```bash
+# Get page 2 with 50 VMs per page
+curl "http://localhost:8000/api/vms?page=2&per_page=50" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Updating a VM
+
+### Update VM Details
+
+<CodeGroup>
+
+```bash cURL
+curl -X PUT http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hostname": "web-server-01-updated",
+    "tags": ["production", "web-server", "nginx", "ssl"],
+    "deployment_notes": "# Web Server\n\n## Recent Changes\n- Added SSL certificate\n- Updated Nginx to 1.25"
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.put(
+    "http://localhost:8000/api/vms/123",
+    headers={"Authorization": "Bearer YOUR_TOKEN"},
+    json={
+        "hostname": "web-server-01-updated",
+        "tags": ["production", "web-server", "nginx", "ssl"],
+        "deployment_notes": "# Web Server\n\n## Recent Changes\n- Added SSL certificate\n- Updated Nginx to 1.25"
+    }
+)
+
+vm = response.json()
+print(f"VM updated: {vm['data']['hostname']}")
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/api/vms/123', {
+  method: 'PUT',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    hostname: 'web-server-01-updated',
+    tags: ['production', 'web-server', 'nginx', 'ssl'],
+    deployment_notes: '# Web Server\n\n## Recent Changes\n- Added SSL certificate\n- Updated Nginx to 1.25'
+  })
+});
+
+const vm = await response.json();
+console.log(`VM updated: ${vm.data.hostname}`);
+```
+
+</CodeGroup>
+
+### Update SSH Credentials
+
+```bash
+# Rotate SSH key
+curl -X PUT http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nNEW_KEY_HERE\n-----END OPENSSH PRIVATE KEY-----"
+  }'
+```
+
+<Warning>
+**Security Note**: When you update SSH credentials, VMLedger:
+1. Validates the new key format
+2. Re-encrypts with AES-256
+3. Deletes the old encrypted credentials
+4. Tests the new credentials on next metric collection
+</Warning>
+
+## Deleting a VM
+
+### Delete Single VM
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    "http://localhost:8000/api/vms/123",
+    headers={"Authorization": "Bearer YOUR_TOKEN"}
+)
+
+result = response.json()
+print(f"VM deleted: {result['success']}")
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/api/vms/123', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN'
+  }
+});
+
+const result = await response.json();
+console.log(`VM deleted: ${result.success}`);
+```
+
+</CodeGroup>
+
+**What Gets Deleted:**
+```mermaid
+flowchart LR
+    A[Delete VM] --> B[VM Record]
+    A --> C[SSH Credentials]
+    A --> D[Ping History]
+    A --> E[Metrics History]
+    A --> F[Alert History]
+    A --> G[Alert Config]
+    A --> H[Deployment Notes]
+    
+    style A fill:#ef4444
+    style B fill:#fca5a5
+    style C fill:#fca5a5
+    style D fill:#fca5a5
+    style E fill:#fca5a5
+    style F fill:#fca5a5
+    style G fill:#fca5a5
+    style H fill:#fca5a5
+```
+
+<Warning>
+**Permanent Deletion**: This action cannot be undone. All monitoring data, credentials, and deployment notes are permanently deleted.
+</Warning>
+
+## VM Organization with Tags
+
+Tags help you organize and filter VMs by purpose, environment, or technology:
+
+### Common Tag Strategies
+
+<CardGroup cols={2}>
+  <Card title="By Environment" icon="layer-group">
+    `production`, `staging`, `development`, `testing`
+  </Card>
+  
+  <Card title="By Purpose" icon="bullseye">
+    `web-server`, `database`, `cache`, `load-balancer`
+  </Card>
+  
+  <Card title="By Technology" icon="code">
+    `nginx`, `postgresql`, `redis`, `docker`
+  </Card>
+  
+  <Card title="By Location" icon="location-dot">
+    `us-east`, `eu-west`, `asia-pacific`, `on-premise`
+  </Card>
+</CardGroup>
+
+### Tag Best Practices
+
+```mermaid
+mindmap
+  root((VM Tags))
+    Environment
+      production
+      staging
+      development
+    Purpose
+      web-server
+      database
+      cache
+    Technology
+      nginx
+      postgresql
+      redis
+    Location
+      us-east
+      eu-west
+      on-premise
+    Team
+      frontend
+      backend
+      devops
+```
+
+**Example: Well-Tagged VM**
+```json
+{
+  "hostname": "api-server-prod-01",
+  "tags": [
+    "production",
+    "api-server",
+    "nodejs",
+    "us-east",
+    "backend-team"
+  ]
+}
+```
+
+## Deployment Notes
+
+Deployment notes are Markdown-formatted documentation stored with each VM:
+
+### What to Document
+
+<AccordionGroup>
+  <Accordion title="Installed Software" icon="box">
+    ```markdown
+    ## Installed Software
+    - Nginx 1.24.0 (reverse proxy)
+    - Node.js 20.11.0 (runtime)
+    - PM2 5.3.0 (process manager)
+    - PostgreSQL 15.5 (database)
+    ```
+  </Accordion>
+  
+  <Accordion title="Configuration Files" icon="file-code">
+    ```markdown
+    ## Configuration
+    - Nginx config: `/etc/nginx/sites-available/myapp`
+    - PM2 ecosystem: `/home/deploy/ecosystem.config.js`
+    - Environment vars: `/home/deploy/.env`
+    ```
+  </Accordion>
+  
+  <Accordion title="Deployment History" icon="clock-rotate-left">
+    ```markdown
+    ## Deployment History
+    ### 2026-05-08
+    - Deployed v2.5.0
+    - Added SSL certificate
+    - Updated Node.js to 20.11.0
+    
+    ### 2026-05-01
+    - Deployed v2.4.0
+    - Migrated database to PostgreSQL 15
+    ```
+  </Accordion>
+  
+  <Accordion title="Access Information" icon="key">
+    ```markdown
+    ## Access
+    - SSH: `ssh deploy@192.168.1.100`
+    - Web: `https://api.example.com`
+    - Database: `postgresql://192.168.1.100:5432/myapp`
+    ```
+  </Accordion>
+  
+  <Accordion title="Troubleshooting" icon="wrench">
+    ```markdown
+    ## Troubleshooting
+    ### High CPU Usage
+    1. Check PM2 logs: `pm2 logs`
+    2. Restart app: `pm2 restart all`
+    3. Check Nginx logs: `tail -f /var/log/nginx/error.log`
+    
+    ### Database Connection Issues
+    1. Check PostgreSQL status: `systemctl status postgresql`
+    2. Verify connection: `psql -U myapp -d myapp`
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Markdown Features
+
+VMLedger supports full Markdown syntax:
+
+```markdown
+# Heading 1
+## Heading 2
+### Heading 3
+
+**Bold text**
+*Italic text*
+`Code inline`
+
+- Bullet list
+- Item 2
+
+1. Numbered list
+2. Item 2
+
+[Link text](https://example.com)
+
+> Blockquote
+
+\`\`\`bash
+# Code block
+echo "Hello World"
+\`\`\`
+
+| Table | Header |
+|-------|--------|
+| Cell  | Cell   |
+```
+
+## Validation Rules
+
+VMLedger enforces these validation rules:
+
+<AccordionGroup>
+  <Accordion title="IP Address" icon="network-wired">
+    **Valid:**
+    - IPv4: `192.168.1.100`, `10.0.0.1`, `172.16.0.1`
+    - IPv6: `2001:db8::1`, `fe80::1`, `::1`
+    
+    **Invalid:**
+    - `999.999.999.999` (out of range)
+    - `192.168.1` (incomplete)
+    - `not-an-ip` (not an IP)
+  </Accordion>
+  
+  <Accordion title="SSH Port" icon="door-open">
+    **Valid:** 1 to 65535
+    
+    **Common ports:**
+    - `22` (default SSH)
+    - `2222` (alternate SSH)
+    - `22000-22999` (custom SSH range)
+    
+    **Invalid:**
+    - `0` (reserved)
+    - `70000` (out of range)
+    - `-1` (negative)
+  </Accordion>
+  
+  <Accordion title="Hostname" icon="tag">
+    **Valid:**
+    - 1 to 255 characters
+    - Alphanumeric + hyphens
+    - Examples: `web-server-01`, `db-prod`, `cache-01`
+    
+    **Invalid:**
+    - Empty string
+    - Over 255 characters
+    - Special characters (except hyphens)
+  </Accordion>
+  
+  <Accordion title="Tags" icon="tags">
+    **Valid:**
+    - Maximum 20 tags per VM
+    - Each tag: 1 to 50 characters
+    - Examples: `production`, `web-server`, `nginx`
+    
+    **Invalid:**
+    - More than 20 tags
+    - Empty tags
+    - Tags over 50 characters
+  </Accordion>
+  
+  <Accordion title="Deployment Notes" icon="file-lines">
+    **Valid:**
+    - 0 to 50,000 characters
+    - Any Markdown syntax
+    - Unicode characters supported
+    
+    **Invalid:**
+    - Over 50,000 characters
+  </Accordion>
+  
+  <Accordion title="SSH Credentials" icon="key">
+    **Valid SSH Key Formats:**
+    - RSA (2048-bit or higher)
+    - ECDSA (256-bit, 384-bit, 521-bit)
+    - Ed25519
+    - DSA (deprecated but supported)
+    
+    **Invalid:**
+    - Passphrase-protected keys
+    - Corrupted key files
+    - Public keys (need private key)
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Duplicate VM Error" icon="clone">
+    **Error:** `VM with this IP and port already exists`
+    
+    **Cause:** You already registered a VM with the same IP address and SSH port.
+    
+    **Solution:**
+    1. Check existing VMs:
+       ```bash
+       curl http://localhost:8000/api/vms \
+         -H "Authorization: Bearer YOUR_TOKEN"
+       ```
+    2. Either:
+       - Update the existing VM instead of creating new one
+       - Use a different SSH port if it's actually a different VM
+       - Delete the old VM if it's no longer needed
+  </Accordion>
+  
+  <Accordion title="Invalid SSH Key" icon="key">
+    **Error:** `Invalid SSH private key format`
+    
+    **Cause:** The SSH key is not in a supported format or is corrupted.
+    
+    **Solution:**
+    1. Verify key format:
+       ```bash
+       head -1 ~/.ssh/id_rsa
+       # Should show: -----BEGIN OPENSSH PRIVATE KEY-----
+       # or: -----BEGIN RSA PRIVATE KEY-----
+       ```
+    
+    2. Generate new key if needed:
+       ```bash
+       ssh-keygen -t ed25519 -f ~/.ssh/vmledger_key -N ""
+       ```
+    
+    3. Ensure key is NOT passphrase-protected:
+       ```bash
+       # Remove passphrase from existing key
+       ssh-keygen -p -f ~/.ssh/id_rsa -N ""
+       ```
+  </Accordion>
+  
+  <Accordion title="VM Not Reachable After Registration" icon="circle-xmark">
+    **Symptom:** `is_reachable` stays `null` or becomes `false`
+    
+    **Possible Causes:**
+    1. **Firewall blocking**: SSH port not accessible
+    2. **Wrong IP/port**: Typo in registration
+    3. **SSH not running**: SSH service down on VM
+    4. **Wrong credentials**: SSH key doesn't match VM
+    
+    **Troubleshooting:**
+    ```bash
+    # 1. Test ping manually
+    ping 192.168.1.100
+    
+    # 2. Test SSH port manually
+    nc -zv 192.168.1.100 22
+    
+    # 3. Test SSH connection manually
+    ssh -i ~/.ssh/vmledger_key root@192.168.1.100
+    
+    # 4. Check VMLedger logs
+    docker logs vmledger-api
+    docker logs vmledger-celery-worker
+    ```
+  </Accordion>
+  
+  <Accordion title="Metrics Not Collecting" icon="chart-line">
+    **Symptom:** `latest_cpu`, `latest_ram_used` stay `null`
+    
+    **Possible Causes:**
+    1. **SSH authentication failed**: Wrong credentials
+    2. **Commands not found**: VM missing required commands
+    3. **Permission denied**: SSH user lacks permissions
+    
+    **Troubleshooting:**
+    ```bash
+    # 1. Check alert history for SSH errors
+    curl http://localhost:8000/api/vms/123/alerts/history \
+      -H "Authorization: Bearer YOUR_TOKEN"
+    
+    # 2. Test SSH commands manually
+    ssh root@192.168.1.100 "top -bn1 | grep 'Cpu(s)'"
+    ssh root@192.168.1.100 "free -m"
+    ssh root@192.168.1.100 "df -h /"
+    
+    # 3. Check Celery worker logs
+    docker logs vmledger-celery-worker
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Health Monitoring" icon="heart-pulse" href="/features/health-monitoring">
+    Learn how VMLedger monitors VM health and collects metrics
+  </Card>
+  
+  <Card title="Alerting" icon="bell" href="/features/alerting">
+    Set up alerts to get notified when VMs go down
+  </Card>
+  
+  <Card title="Search Engine" icon="magnifying-glass" href="/features/search-engine">
+    Find VMs instantly by IP, hostname, or deployment notes
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/virtual-machines">
+    Complete API documentation for VM endpoints
+  </Card>
+</CardGroup>

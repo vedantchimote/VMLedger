@@ -1,0 +1,669 @@
+---
+title: 'Monitoring'
+description: 'Understanding how VMLedger monitors your virtual machines'
+---
+
+## What is Monitoring?
+
+**Monitoring** means continuously checking if your VMs are healthy and collecting information about their performance.
+
+<Info>
+  Think of monitoring like a doctor checking your vital signs (heart rate, blood pressure, temperature) to make sure you're healthy!
+</Info>
+
+## Types of Monitoring
+
+VMLedger performs two types of monitoring:
+
+```mermaid
+graph TB
+    A[VM Monitoring] --> B[Health Checks]
+    A --> C[Metrics Collection]
+    
+    B --> B1[Ping Test]
+    B --> B2[Every 60 seconds]
+    B --> B3[Is VM reachable?]
+    
+    C --> C1[SSH Connection]
+    C --> C2[Every 5 minutes]
+    C --> C3[CPU, Memory, Disk, Network]
+    
+    style A fill:#2196F3,color:#fff
+    style B fill:#4CAF50,color:#fff
+    style C fill:#FF9800,color:#fff
+```
+
+### 1. Health Checks (Ping)
+
+**Purpose**: Quickly check if VM is online
+
+**How it works**:
+```mermaid
+sequenceDiagram
+    participant VMLedger
+    participant Network
+    participant VM
+    
+    Note over VMLedger: Every 60 seconds
+    
+    VMLedger->>Network: Send ICMP Echo Request
+    Network->>VM: Forward packet
+    
+    alt VM is Online
+        VM->>Network: ICMP Echo Reply
+        Network->>VMLedger: Packet received
+        VMLedger->>VMLedger: Record: Status = Healthy ✓
+    else VM is Offline
+        Network--xVMLedger: Timeout (no response)
+        VMLedger->>VMLedger: Record: Status = Down ✗
+        VMLedger->>VMLedger: Send alert (if configured)
+    end
+```
+
+<Accordion title="What is ICMP Ping?">
+  **ICMP (Internet Control Message Protocol)** is like sending a "Hello?" message to your VM.
+  
+  **How it works**:
+  1. VMLedger sends: "Are you there?"
+  2. VM responds: "Yes, I'm here!"
+  3. VMLedger records: "VM is healthy"
+  
+  **If no response**: VM might be down, network issue, or firewall blocking
+</Accordion>
+
+### 2. Metrics Collection (SSH)
+
+**Purpose**: Collect detailed system information
+
+**How it works**:
+```mermaid
+sequenceDiagram
+    participant VMLedger
+    participant VM
+    participant Database
+    
+    Note over VMLedger: Every 5 minutes
+    
+    VMLedger->>VM: SSH Connect
+    VM-->>VMLedger: Connection established
+    
+    VMLedger->>VM: Execute: top -bn1
+    VM-->>VMLedger: CPU usage: 45%
+    
+    VMLedger->>VM: Execute: free -m
+    VM-->>VMLedger: Memory: 60% used
+    
+    VMLedger->>VM: Execute: df -h
+    VM-->>VMLedger: Disk: 70% used
+    
+    VMLedger->>VM: Execute: cat /proc/net/dev
+    VM-->>VMLedger: Network: 1.2GB sent, 800MB received
+    
+    VMLedger->>VM: Disconnect
+    
+    VMLedger->>Database: Save all metrics
+    Database-->>VMLedger: Saved successfully
+```
+
+## Monitoring Intervals
+
+```mermaid
+gantt
+    title Monitoring Timeline
+    dateFormat  ss
+    axisFormat  %S sec
+    
+    section Health Checks
+    Ping Check 1    :done, 00, 1s
+    Wait           :active, 01, 59s
+    Ping Check 2    :done, 60, 1s
+    Wait           :active, 61, 59s
+    Ping Check 3    :done, 120, 1s
+    
+    section Metrics
+    Collect Metrics 1 :crit, 00, 5s
+    Wait             :active, 05, 295s
+    Collect Metrics 2 :crit, 300, 5s
+```
+
+<CardGroup cols={2}>
+  <Card title="Health Checks" icon="heart-pulse">
+    **Frequency**: Every 60 seconds
+    
+    **Duration**: < 1 second
+    
+    **Purpose**: Quick availability check
+    
+    **Impact**: Minimal (tiny network packet)
+  </Card>
+  
+  <Card title="Metrics Collection" icon="chart-line">
+    **Frequency**: Every 5 minutes (300 seconds)
+    
+    **Duration**: 2-5 seconds
+    
+    **Purpose**: Detailed performance data
+    
+    **Impact**: Low (brief SSH connection)
+  </Card>
+</CardGroup>
+
+## Collected Metrics
+
+### CPU Usage
+
+**What it measures**: How much processing power is being used
+
+```mermaid
+graph LR
+    A[CPU Metrics] --> B[Overall Usage %]
+    A --> C[Per-Core Usage]
+    A --> D[Load Average]
+    
+    B --> E[0-100%]
+    C --> F[Core 1: 45%<br/>Core 2: 60%<br/>Core 3: 30%<br/>Core 4: 55%]
+    D --> G[1-min: 2.5<br/>5-min: 2.1<br/>15-min: 1.8]
+    
+    style A fill:#2196F3,color:#fff
+    style E fill:#4CAF50,color:#fff
+    style F fill:#FF9800,color:#fff
+    style G fill:#9C27B0,color:#fff
+```
+
+**Interpretation**:
+
+<Tabs>
+  <Tab title="0-50% (Normal)">
+    **Status**: ✓ Healthy
+    
+    **Meaning**: VM has plenty of CPU capacity
+    
+    **Action**: None needed
+    
+    **Example**: Web server handling normal traffic
+  </Tab>
+  
+  <Tab title="50-80% (Busy)">
+    **Status**: ⚠️ Elevated
+    
+    **Meaning**: VM is working hard but managing
+    
+    **Action**: Monitor closely, consider scaling if sustained
+    
+    **Example**: Database during peak hours
+  </Tab>
+  
+  <Tab title="80-100% (Overloaded)">
+    **Status**: ⚠️ Critical
+    
+    **Meaning**: VM is at maximum capacity
+    
+    **Action**: Investigate immediately, scale up or optimize
+    
+    **Example**: Application under heavy load or runaway process
+  </Tab>
+</Tabs>
+
+### Memory Usage
+
+**What it measures**: How much RAM is being used
+
+```mermaid
+graph TB
+    A[Memory Metrics] --> B[Total Memory]
+    A --> C[Used Memory]
+    A --> D[Free Memory]
+    A --> E[Cached Memory]
+    A --> F[Swap Usage]
+    
+    B --> B1[8 GB]
+    C --> C1[4.8 GB 60%]
+    D --> D1[1.2 GB 15%]
+    E --> E1[2.0 GB 25%]
+    F --> F1[0 GB 0%]
+    
+    style A fill:#2196F3,color:#fff
+    style C1 fill:#FF9800,color:#fff
+    style D1 fill:#4CAF50,color:#fff
+    style F1 fill:#4CAF50,color:#fff
+```
+
+**Interpretation**:
+
+<AccordionGroup>
+  <Accordion title="0-60% Used (Normal)">
+    **Status**: ✓ Healthy
+    
+    **What it means**: Plenty of memory available
+    
+    **Linux note**: Linux uses "free" memory for caching, so high cache is normal!
+  </Accordion>
+  
+  <Accordion title="60-85% Used (High)">
+    **Status**: ⚠️ Elevated
+    
+    **What it means**: Memory is getting tight
+    
+    **Action**: Monitor applications, consider adding RAM
+  </Accordion>
+  
+  <Accordion title="85-100% Used (Critical)">
+    **Status**: ⚠️ Critical
+    
+    **What it means**: Running out of memory
+    
+    **Symptoms**: Slow performance, applications crashing
+    
+    **Action**: Restart services, add RAM, or optimize applications
+  </Accordion>
+  
+  <Accordion title="Swap Usage > 0">
+    **Status**: ⚠️ Warning
+    
+    **What it means**: System is using disk as "virtual memory"
+    
+    **Impact**: Significant performance degradation
+    
+    **Action**: Add more RAM or reduce memory usage
+  </Accordion>
+</AccordionGroup>
+
+### Disk Usage
+
+**What it measures**: How much storage space is used
+
+```mermaid
+graph TB
+    A[Disk Metrics] --> B[Root Partition /]
+    A --> C[Data Partition /data]
+    A --> D[Temp Partition /tmp]
+    
+    B --> B1[Total: 100 GB<br/>Used: 70 GB 70%<br/>Free: 30 GB]
+    C --> C1[Total: 500 GB<br/>Used: 250 GB 50%<br/>Free: 250 GB]
+    D --> D1[Total: 10 GB<br/>Used: 2 GB 20%<br/>Free: 8 GB]
+    
+    style A fill:#2196F3,color:#fff
+    style B1 fill:#FF9800,color:#fff
+    style C1 fill:#4CAF50,color:#fff
+    style D1 fill:#4CAF50,color:#fff
+```
+
+**Interpretation**:
+
+| Usage | Status | Action |
+|-------|--------|--------|
+| 0-70% | ✓ Normal | None needed |
+| 70-90% | ⚠️ High | Plan cleanup or expansion |
+| 90-95% | ⚠️ Critical | Clean up immediately |
+| 95-100% | ⚠️ Emergency | System may fail, clean up now! |
+
+<Warning>
+  **Disk full = System failure!** When disk reaches 100%, applications crash, logs stop writing, and system becomes unstable.
+</Warning>
+
+### Network Traffic
+
+**What it measures**: Data sent and received over network
+
+```mermaid
+graph LR
+    A[Network Metrics] --> B[Bytes Sent]
+    A --> C[Bytes Received]
+    A --> D[Packets Sent]
+    A --> E[Packets Received]
+    A --> F[Errors]
+    
+    B --> B1[1.2 GB]
+    C --> C1[800 MB]
+    D --> D1[1.5M packets]
+    E --> E1[1.2M packets]
+    F --> F1[0 errors ✓]
+    
+    style A fill:#2196F3,color:#fff
+    style F1 fill:#4CAF50,color:#fff
+```
+
+**What to watch for**:
+
+<CardGroup cols={2}>
+  <Card title="High Traffic" icon="arrow-up">
+    **Normal**: Web server, database, file server
+    
+    **Abnormal**: Sudden spike (DDoS attack, data breach)
+  </Card>
+  
+  <Card title="Network Errors" icon="triangle-exclamation">
+    **Causes**: Bad network cable, faulty NIC, network congestion
+    
+    **Action**: Check physical connections, replace hardware
+  </Card>
+</CardGroup>
+
+## Monitoring Workflow
+
+### Complete Monitoring Cycle
+
+```mermaid
+flowchart TB
+    Start([Celery Beat Scheduler]) --> A{Time for Check?}
+    A -->|Every 60s| B[Health Check Task]
+    A -->|Every 5min| C[Metrics Collection Task]
+    
+    B --> D[Get All Active VMs]
+    D --> E[For Each VM]
+    E --> F[Send Ping]
+    F --> G{Response?}
+    
+    G -->|Yes| H[Status: Healthy]
+    G -->|No| I[Status: Down]
+    
+    H --> J[Save to Database]
+    I --> K{Alert Configured?}
+    K -->|Yes| L{In Cooldown?}
+    K -->|No| J
+    L -->|No| M[Send Alert]
+    L -->|Yes| J
+    M --> N[Start Cooldown Timer]
+    N --> J
+    
+    C --> O[Get All Active VMs]
+    O --> P[For Each VM]
+    P --> Q[SSH Connect]
+    Q --> R{Connected?}
+    
+    R -->|Yes| S[Collect CPU]
+    R -->|No| T[Log Error]
+    
+    S --> U[Collect Memory]
+    U --> V[Collect Disk]
+    V --> W[Collect Network]
+    W --> X[Disconnect SSH]
+    X --> Y[Save Metrics to Database]
+    
+    T --> Y
+    J --> End([Wait for Next Cycle])
+    Y --> End
+    
+    style Start fill:#4CAF50,color:#fff
+    style B fill:#2196F3,color:#fff
+    style C fill:#FF9800,color:#fff
+    style M fill:#F44336,color:#fff
+    style End fill:#4CAF50,color:#fff
+```
+
+### Data Storage
+
+```mermaid
+graph TB
+    subgraph "Monitoring Data"
+        A[Health Check Result]
+        B[System Metrics]
+    end
+    
+    subgraph "PostgreSQL Database"
+        C[monitoring_data table]
+        D[vm_metrics table]
+    end
+    
+    subgraph "Data Retention"
+        E[Last 30 days: Full detail]
+        F[30-90 days: Hourly aggregates]
+        G[90+ days: Daily aggregates]
+    end
+    
+    A --> C
+    B --> D
+    
+    C --> E
+    D --> E
+    E --> F
+    F --> G
+    
+    style A fill:#4CAF50,color:#fff
+    style B fill:#FF9800,color:#fff
+    style C fill:#2196F3,color:#fff
+    style D fill:#2196F3,color:#fff
+```
+
+<Info>
+  **Data retention** helps manage database size while keeping historical trends available.
+</Info>
+
+## Monitoring Dashboard
+
+### What You See
+
+```mermaid
+graph TB
+    A[Dashboard] --> B[VM List]
+    A --> C[Health Overview]
+    A --> D[Metrics Charts]
+    A --> E[Recent Alerts]
+    
+    B --> B1[All VMs with status]
+    B --> B2[Filter by tags]
+    B --> B3[Search by name]
+    
+    C --> C1[Total VMs: 25]
+    C --> C2[Healthy: 23 ✓]
+    C --> C3[Down: 2 ✗]
+    
+    D --> D1[CPU Usage Graph]
+    D --> D2[Memory Usage Graph]
+    D --> D3[Disk Usage Graph]
+    
+    E --> E1[VM web-1 down]
+    E --> E2[VM db-2 high CPU]
+    
+    style A fill:#2196F3,color:#fff
+    style C2 fill:#4CAF50,color:#fff
+    style C3 fill:#F44336,color:#fff
+```
+
+### Real-Time Updates
+
+The dashboard updates automatically:
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API
+    participant Database
+    
+    Note over Browser: Every 30 seconds
+    
+    Browser->>API: GET /api/dashboard
+    API->>Database: Query latest data
+    Database-->>API: VM statuses + metrics
+    API-->>Browser: JSON response
+    Browser->>Browser: Update UI
+    
+    Note over Browser: User sees fresh data!
+```
+
+## Monitoring Best Practices
+
+### 1. Set Appropriate Intervals
+
+<Tabs>
+  <Tab title="Critical Systems">
+    **Health Checks**: Every 30 seconds
+    **Metrics**: Every 2 minutes
+    
+    **Use for**: Production databases, payment systems, critical APIs
+  </Tab>
+  
+  <Tab title="Standard Systems">
+    **Health Checks**: Every 60 seconds (default)
+    **Metrics**: Every 5 minutes (default)
+    
+    **Use for**: Most production systems
+  </Tab>
+  
+  <Tab title="Development Systems">
+    **Health Checks**: Every 5 minutes
+    **Metrics**: Every 15 minutes
+    
+    **Use for**: Development, testing environments
+  </Tab>
+</Tabs>
+
+### 2. Configure Alerts Wisely
+
+```mermaid
+graph TB
+    A[Alert Strategy] --> B[Critical Alerts]
+    A --> C[Warning Alerts]
+    A --> D[Info Alerts]
+    
+    B --> B1[VM Down]
+    B --> B2[Disk > 95%]
+    B --> B3[Memory > 95%]
+    B --> B4[Send immediately]
+    
+    C --> C1[CPU > 80%]
+    C --> C2[Disk > 85%]
+    C --> C3[Memory > 85%]
+    C --> C4[Send after 5 minutes]
+    
+    D --> D1[New VM added]
+    D --> D2[Deployment completed]
+    D --> D3[Send daily digest]
+    
+    style B fill:#F44336,color:#fff
+    style C fill:#FF9800,color:#fff
+    style D fill:#2196F3,color:#fff
+```
+
+### 3. Use Tags for Organization
+
+```mermaid
+graph LR
+    A[Monitoring Groups] --> B[By Environment]
+    A --> C[By Criticality]
+    A --> D[By Team]
+    
+    B --> B1[production: Alert immediately]
+    B --> B2[staging: Alert during business hours]
+    B --> B3[development: No alerts]
+    
+    C --> C1[critical: 24/7 monitoring]
+    C --> C2[important: Business hours]
+    C --> C3[standard: Daily checks]
+    
+    D --> D1[team-backend: Backend channel]
+    D --> D2[team-frontend: Frontend channel]
+    D --> D3[team-devops: DevOps channel]
+    
+    style A fill:#607D8B,color:#fff
+    style B1 fill:#F44336,color:#fff
+    style C1 fill:#F44336,color:#fff
+```
+
+## Troubleshooting Monitoring Issues
+
+<AccordionGroup>
+  <Accordion title="Health checks always fail">
+    **Symptoms**: VM shows as "Down" but it's actually running
+    
+    **Possible causes**:
+    1. **Firewall blocking ICMP**: Allow ping from VMLedger server
+    2. **ICMP disabled on VM**: Enable ICMP echo replies
+    3. **Network routing issue**: Check network path
+    
+    **Test manually**:
+    ```bash
+    # From VMLedger server
+    ping -c 4 <vm-ip-address>
+    ```
+    
+    **Fix**:
+    ```bash
+    # On VM (Ubuntu/Debian)
+    sudo ufw allow from <vmledger-ip> to any proto icmp
+    
+    # On VM (CentOS/RHEL)
+    sudo firewall-cmd --add-rich-rule='rule family="ipv4" source address="<vmledger-ip>" protocol value="icmp" accept' --permanent
+    sudo firewall-cmd --reload
+    ```
+  </Accordion>
+  
+  <Accordion title="Metrics not collecting">
+    **Symptoms**: No CPU/memory/disk data shown
+    
+    **Possible causes**:
+    1. **SSH connection failed**: Wrong credentials
+    2. **SSH port blocked**: Firewall issue
+    3. **Commands not found**: Missing system tools
+    
+    **Test manually**:
+    ```bash
+    # Test SSH connection
+    ssh -i /path/to/key username@<vm-ip> -p <port>
+    
+    # Test commands
+    top -bn1 | head -5
+    free -m
+    df -h
+    ```
+    
+    **Fix**:
+    - Verify SSH credentials in VMLedger
+    - Check firewall allows SSH from VMLedger server
+    - Install missing tools: `sudo apt-get install procps sysstat`
+  </Accordion>
+  
+  <Accordion title="Metrics delayed or missing">
+    **Symptoms**: Metrics are old or gaps in data
+    
+    **Possible causes**:
+    1. **Celery workers overloaded**: Too many VMs
+    2. **Database slow**: Performance issue
+    3. **Network latency**: Slow SSH connections
+    
+    **Check Celery workers**:
+    ```bash
+    docker-compose logs celery-worker
+    ```
+    
+    **Fix**:
+    - Add more Celery workers
+    - Increase monitoring intervals
+    - Optimize database queries
+  </Accordion>
+  
+  <Accordion title="High CPU on VMLedger server">
+    **Symptoms**: VMLedger itself using too much CPU
+    
+    **Possible causes**:
+    1. **Too many VMs**: Monitoring hundreds of VMs
+    2. **Intervals too short**: Checking too frequently
+    3. **Inefficient queries**: Database performance
+    
+    **Solutions**:
+    - Increase monitoring intervals
+    - Add more Celery workers
+    - Optimize database with indexes
+    - Scale VMLedger horizontally
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Alerts" icon="bell" href="/features/alerting">
+    Set up notifications for monitoring events
+  </Card>
+  
+  <Card title="Metrics API" icon="code" href="/api-reference/monitoring">
+    Access monitoring data programmatically
+  </Card>
+  
+  <Card title="Dashboards" icon="chart-line" href="/features/health-monitoring">
+    Visualize your monitoring data
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/development/troubleshooting">
+    Common monitoring issues and solutions
+  </Card>
+</CardGroup>

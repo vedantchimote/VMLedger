@@ -1,0 +1,520 @@
+---
+title: 'Core Concepts Overview'
+description: 'Understanding the fundamental concepts of VMLedger'
+---
+
+## What is VMLedger?
+
+VMLedger is a **centralized platform** for managing and monitoring virtual machines (VMs). Think of it as a control center where you can:
+
+- 📋 Keep track of all your VMs in one place
+- 💓 Monitor their health automatically
+- 🔔 Get notified when something goes wrong
+- 🚀 Track deployments and changes
+- 🔍 Search and filter your VM inventory
+
+<Note>
+  **New to infrastructure management?** Don't worry! We'll explain everything step by step.
+</Note>
+
+## How VMLedger Works
+
+Here's a simple overview of how VMLedger operates:
+
+```mermaid
+graph TB
+    subgraph "You (User)"
+        A[Add VM Information]
+        B[Configure Monitoring]
+        C[Set Up Alerts]
+    end
+    
+    subgraph "VMLedger Platform"
+        D[Store VM Details]
+        E[Monitor Health]
+        F[Collect Metrics]
+        G[Send Alerts]
+    end
+    
+    subgraph "Your VMs"
+        H[Virtual Machine 1]
+        I[Virtual Machine 2]
+        J[Virtual Machine 3]
+    end
+    
+    A --> D
+    B --> E
+    C --> G
+    
+    E -->|Ping Check| H
+    E -->|Ping Check| I
+    E -->|Ping Check| J
+    
+    F -->|SSH Connection| H
+    F -->|SSH Connection| I
+    F -->|SSH Connection| J
+    
+    H -->|Status| E
+    I -->|Status| E
+    J -->|Status| E
+    
+    E -->|VM Down?| G
+    G -->|Webhook| K[Slack/Discord/Email]
+    
+    style A fill:#e1f5ff
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style K fill:#fff4e1
+```
+
+### Step-by-Step Process
+
+<Steps>
+  <Step title="Add Your VMs">
+    You provide basic information about your VMs:
+    - Hostname (a friendly name)
+    - IP address
+    - SSH credentials (for remote access)
+    - Optional tags for organization
+  </Step>
+  
+  <Step title="Automatic Monitoring Starts">
+    VMLedger automatically begins monitoring:
+    - **Every 60 seconds**: Checks if VM is reachable (ping)
+    - **Every 5 minutes**: Collects system metrics (CPU, memory, disk)
+  </Step>
+  
+  <Step title="Get Notified">
+    When something goes wrong:
+    - VMLedger detects the issue
+    - Sends notification to your webhook (Slack, Discord, etc.)
+    - Records the event in alert history
+  </Step>
+  
+  <Step title="Track Changes">
+    Keep a record of deployments:
+    - What was deployed
+    - When it was deployed
+    - Who deployed it
+    - Deployment notes
+  </Step>
+</Steps>
+
+## Key Concepts Explained
+
+### 1. Virtual Machines (VMs)
+
+<Accordion title="What is a Virtual Machine?">
+  A **virtual machine** is like a computer running inside another computer. It has its own:
+  - Operating system (Linux, Windows, etc.)
+  - CPU and memory allocation
+  - Network connection (IP address)
+  - Storage space
+  
+  **Example**: You might have a physical server running 10 virtual machines, each hosting a different application.
+</Accordion>
+
+In VMLedger, each VM entry contains:
+
+```mermaid
+graph LR
+    VM[Virtual Machine] --> A[Basic Info]
+    VM --> B[Credentials]
+    VM --> C[Monitoring]
+    VM --> D[Metadata]
+    
+    A --> A1[Hostname]
+    A --> A2[IP Address]
+    A --> A3[SSH Port]
+    
+    B --> B1[Username]
+    B --> B2[Private Key]
+    B --> B3[Encrypted Storage]
+    
+    C --> C1[Health Status]
+    C --> C2[Last Check Time]
+    C --> C3[Metrics History]
+    
+    D --> D1[Tags]
+    D --> D2[Description]
+    D --> D3[Created Date]
+    
+    style VM fill:#4CAF50,color:#fff
+    style A fill:#2196F3,color:#fff
+    style B fill:#FF9800,color:#fff
+    style C fill:#9C27B0,color:#fff
+    style D fill:#607D8B,color:#fff
+```
+
+### 2. Health Monitoring
+
+VMLedger continuously checks if your VMs are healthy:
+
+```mermaid
+sequenceDiagram
+    participant VMLedger
+    participant VM
+    participant User
+    
+    Note over VMLedger: Every 60 seconds
+    
+    VMLedger->>VM: Ping (Are you alive?)
+    
+    alt VM is Healthy
+        VM-->>VMLedger: Pong (Yes, I'm here!)
+        VMLedger->>VMLedger: Record: Status = Healthy
+    else VM is Down
+        VM--xVMLedger: No response
+        VMLedger->>VMLedger: Record: Status = Down
+        VMLedger->>User: 🔔 Alert: VM is down!
+    end
+    
+    Note over VMLedger: Every 5 minutes
+    
+    VMLedger->>VM: SSH: Get system metrics
+    VM-->>VMLedger: CPU: 45%, Memory: 60%, Disk: 70%
+    VMLedger->>VMLedger: Store metrics in database
+```
+
+<Info>
+  **Ping** is like saying "Hello, are you there?" to your VM. If it responds, it's healthy!
+</Info>
+
+### 3. System Metrics
+
+VMLedger collects detailed information about your VMs:
+
+<CardGroup cols={2}>
+  <Card title="CPU Usage" icon="microchip">
+    How much processing power is being used
+    - **0-50%**: Normal
+    - **50-80%**: Busy
+    - **80-100%**: Overloaded
+  </Card>
+  
+  <Card title="Memory Usage" icon="memory">
+    How much RAM is being used
+    - **0-60%**: Normal
+    - **60-85%**: High
+    - **85-100%**: Critical
+  </Card>
+  
+  <Card title="Disk Usage" icon="hard-drive">
+    How much storage space is used
+    - **0-70%**: Normal
+    - **70-90%**: High
+    - **90-100%**: Critical
+  </Card>
+  
+  <Card title="Network Traffic" icon="network-wired">
+    Data sent and received
+    - Bytes sent
+    - Bytes received
+    - Network errors
+  </Card>
+</CardGroup>
+
+### 4. Alerts and Notifications
+
+When something goes wrong, VMLedger notifies you:
+
+```mermaid
+graph TD
+    A[VM Health Check] --> B{Is VM Healthy?}
+    B -->|Yes| C[Record Status]
+    B -->|No| D{Alert Configured?}
+    D -->|No| C
+    D -->|Yes| E{In Cooldown Period?}
+    E -->|Yes| F[Skip Alert]
+    E -->|No| G[Send Webhook]
+    G --> H[Slack]
+    G --> I[Discord]
+    G --> J[Custom Endpoint]
+    G --> K[Start Cooldown Timer]
+    K --> C
+    F --> C
+    
+    style B fill:#FFC107
+    style D fill:#2196F3
+    style E fill:#9C27B0
+    style G fill:#4CAF50,color:#fff
+```
+
+<Accordion title="What is a Cooldown Period?">
+  A **cooldown period** prevents alert spam. 
+  
+  **Example**: If your VM goes down, VMLedger sends an alert. Then it waits 15 minutes (cooldown) before sending another alert about the same VM.
+  
+  **Why?** Without cooldown, you might get hundreds of alerts for the same issue!
+</Accordion>
+
+### 5. Deployments
+
+Track what you deploy to your VMs:
+
+```mermaid
+graph LR
+    A[Developer] -->|1. Deploy Code| B[Virtual Machine]
+    A -->|2. Record Deployment| C[VMLedger]
+    
+    C --> D[Deployment Record]
+    D --> E[Timestamp]
+    D --> F[VM ID]
+    D --> G[Notes]
+    D --> H[User]
+    
+    style A fill:#2196F3,color:#fff
+    style B fill:#4CAF50,color:#fff
+    style C fill:#FF9800,color:#fff
+    style D fill:#9C27B0,color:#fff
+```
+
+**Example Deployment Record**:
+```json
+{
+  "vm_id": 5,
+  "deployed_at": "2026-05-08T10:30:00Z",
+  "deployed_by": "john@example.com",
+  "notes": "Deployed v2.1.0 with bug fixes for login issue"
+}
+```
+
+### 6. Search and Filtering
+
+Find VMs quickly using tags and filters:
+
+```mermaid
+graph TB
+    A[All VMs] --> B{Filter by Status}
+    B -->|Active| C[Active VMs]
+    B -->|Inactive| D[Inactive VMs]
+    
+    C --> E{Filter by Tags}
+    E -->|production| F[Production VMs]
+    E -->|staging| G[Staging VMs]
+    E -->|development| H[Dev VMs]
+    
+    F --> I{Search by Name}
+    I -->|"web"| J[web-server-1<br/>web-server-2]
+    I -->|"db"| K[db-primary<br/>db-replica]
+    
+    style A fill:#607D8B,color:#fff
+    style F fill:#4CAF50,color:#fff
+    style G fill:#FF9800,color:#fff
+    style H fill:#2196F3,color:#fff
+```
+
+## Data Flow Overview
+
+Here's how data flows through VMLedger:
+
+```mermaid
+graph TB
+    subgraph "User Interface"
+        UI[Web Dashboard<br/>Port 3000]
+    end
+    
+    subgraph "API Layer"
+        API[REST API<br/>Port 8000]
+    end
+    
+    subgraph "Background Jobs"
+        WORKER[Celery Workers]
+        SCHEDULER[Celery Beat<br/>Task Scheduler]
+    end
+    
+    subgraph "Storage"
+        DB[(PostgreSQL<br/>Permanent Data)]
+        CACHE[(Redis<br/>Temporary Data)]
+    end
+    
+    subgraph "External"
+        VMS[Your VMs]
+        WEBHOOKS[Notifications]
+    end
+    
+    UI -->|HTTP Requests| API
+    API -->|Read/Write| DB
+    API -->|Cache| CACHE
+    API -->|Queue Tasks| CACHE
+    
+    SCHEDULER -->|Schedule| CACHE
+    WORKER -->|Get Tasks| CACHE
+    WORKER -->|Save Results| DB
+    WORKER -->|Monitor| VMS
+    WORKER -->|Notify| WEBHOOKS
+    
+    style UI fill:#2196F3,color:#fff
+    style API fill:#4CAF50,color:#fff
+    style WORKER fill:#FF9800,color:#fff
+    style SCHEDULER fill:#9C27B0,color:#fff
+    style DB fill:#F44336,color:#fff
+    style CACHE fill:#FF5722,color:#fff
+```
+
+## Security Concepts
+
+VMLedger keeps your data secure:
+
+```mermaid
+graph TB
+    A[User Login] --> B[Password Hashing<br/>bcrypt]
+    B --> C[JWT Token<br/>24-hour expiry]
+    
+    D[SSH Credentials] --> E[Encryption<br/>AES-256]
+    E --> F[Encrypted Storage<br/>PostgreSQL]
+    
+    G[API Request] --> H[Token Validation]
+    H --> I{Valid Token?}
+    I -->|Yes| J[Process Request]
+    I -->|No| K[Return 401 Error]
+    
+    L[Failed Login] --> M{5 Attempts?}
+    M -->|Yes| N[Lock Account<br/>30 minutes]
+    M -->|No| O[Allow Retry]
+    
+    style B fill:#4CAF50,color:#fff
+    style E fill:#4CAF50,color:#fff
+    style H fill:#2196F3,color:#fff
+    style N fill:#F44336,color:#fff
+```
+
+<AccordionGroup>
+  <Accordion title="Password Hashing">
+    Your password is never stored as plain text. VMLedger uses **bcrypt** to convert it into a scrambled string that can't be reversed.
+    
+    **Example**:
+    - Your password: `MySecurePass123!`
+    - Stored in database: `$2b$12$KIXxKj8N9yGmP7vQx.../...`
+  </Accordion>
+  
+  <Accordion title="JWT Tokens">
+    After login, you receive a **JWT token** (like a temporary pass). This token:
+    - Expires after 24 hours
+    - Must be included in every API request
+    - Can be invalidated when you logout
+  </Accordion>
+  
+  <Accordion title="Credential Encryption">
+    SSH credentials are encrypted before storage:
+    - Uses AES-256 encryption (military-grade)
+    - Each user has a unique encryption salt
+    - Decrypted only when needed for SSH connections
+  </Accordion>
+</AccordionGroup>
+
+## Common Workflows
+
+### Adding and Monitoring a VM
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Dashboard
+    participant API
+    participant Database
+    participant Monitor
+    participant VM
+    
+    User->>Dashboard: Click "Add VM"
+    User->>Dashboard: Fill in VM details
+    Dashboard->>API: POST /api/vms
+    API->>API: Validate input
+    API->>API: Encrypt SSH credentials
+    API->>Database: Save VM record
+    Database-->>API: VM created (ID: 1)
+    API-->>Dashboard: Success response
+    Dashboard-->>User: Show success message
+    
+    Note over Monitor: 60 seconds later
+    
+    Monitor->>Database: Get all active VMs
+    Database-->>Monitor: VM list (including new VM)
+    Monitor->>VM: Ping check
+    VM-->>Monitor: Response received
+    Monitor->>Database: Save health status
+    
+    Note over Monitor: 5 minutes later
+    
+    Monitor->>VM: SSH: Get metrics
+    VM-->>Monitor: CPU, Memory, Disk data
+    Monitor->>Database: Save metrics
+```
+
+### Receiving an Alert
+
+```mermaid
+sequenceDiagram
+    participant Monitor
+    participant VM
+    participant Database
+    participant Webhook
+    participant Slack
+    
+    Monitor->>VM: Ping check
+    VM--xMonitor: No response (timeout)
+    Monitor->>Database: Check alert config
+    Database-->>Monitor: Alert enabled, webhook URL
+    Monitor->>Database: Check cooldown
+    Database-->>Monitor: Not in cooldown
+    Monitor->>Webhook: POST alert data
+    Webhook->>Slack: Send message
+    Slack-->>Webhook: Message delivered
+    Webhook-->>Monitor: Success
+    Monitor->>Database: Record alert sent
+    Monitor->>Database: Start 15-min cooldown
+```
+
+## Next Steps
+
+Now that you understand the core concepts, explore specific features:
+
+<CardGroup cols={2}>
+  <Card title="Virtual Machines" icon="server" href="/concepts/virtual-machines">
+    Deep dive into VM management
+  </Card>
+  
+  <Card title="Monitoring" icon="heart-pulse" href="/concepts/monitoring">
+    Learn about health checks and metrics
+  </Card>
+  
+  <Card title="Authentication" icon="lock" href="/concepts/authentication">
+    Understand security and access control
+  </Card>
+  
+  <Card title="Deployments" icon="rocket" href="/concepts/deployments">
+    Track changes to your VMs
+  </Card>
+</CardGroup>
+
+## Glossary
+
+<AccordionGroup>
+  <Accordion title="API (Application Programming Interface)">
+    A way for programs to talk to each other. VMLedger's API lets you manage VMs programmatically.
+  </Accordion>
+  
+  <Accordion title="SSH (Secure Shell)">
+    A secure way to connect to and control remote computers. VMLedger uses SSH to collect metrics from your VMs.
+  </Accordion>
+  
+  <Accordion title="Webhook">
+    A way for VMLedger to send notifications to other services (like Slack) when events occur.
+  </Accordion>
+  
+  <Accordion title="JWT (JSON Web Token)">
+    A secure token that proves you're logged in. Think of it as a temporary digital ID card.
+  </Accordion>
+  
+  <Accordion title="Ping">
+    A simple network test to check if a computer is reachable. Like saying "Hello?" to see if someone's there.
+  </Accordion>
+  
+  <Accordion title="Metrics">
+    Measurements of system performance (CPU usage, memory usage, etc.)
+  </Accordion>
+  
+  <Accordion title="Cooldown Period">
+    A waiting time before sending another alert for the same issue, preventing alert spam.
+  </Accordion>
+</AccordionGroup>

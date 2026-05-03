@@ -1,0 +1,727 @@
+---
+title: 'Virtual Machines'
+description: 'Understanding VM management in VMLedger'
+---
+
+## What is a Virtual Machine?
+
+A **Virtual Machine (VM)** is a software-based computer that runs inside a physical computer. It's like having multiple computers in one!
+
+```mermaid
+graph TB
+    subgraph "Physical Server"
+        HW[Hardware<br/>CPU, RAM, Disk]
+        HYP[Hypervisor<br/>VMware, VirtualBox, KVM]
+        
+        subgraph "Virtual Machine 1"
+            OS1[Ubuntu Linux]
+            APP1[Web Server]
+        end
+        
+        subgraph "Virtual Machine 2"
+            OS2[CentOS Linux]
+            APP2[Database]
+        end
+        
+        subgraph "Virtual Machine 3"
+            OS3[Windows Server]
+            APP3[Application Server]
+        end
+    end
+    
+    HW --> HYP
+    HYP --> OS1
+    HYP --> OS2
+    HYP --> OS3
+    OS1 --> APP1
+    OS2 --> APP2
+    OS3 --> APP3
+    
+    style HW fill:#607D8B,color:#fff
+    style HYP fill:#FF9800,color:#fff
+    style OS1 fill:#4CAF50,color:#fff
+    style OS2 fill:#4CAF50,color:#fff
+    style OS3 fill:#2196F3,color:#fff
+```
+
+<Info>
+  **Real-world analogy**: Think of a physical server as an apartment building, and each VM as a separate apartment. They share the same building (hardware) but are independent units.
+</Info>
+
+## VM Lifecycle in VMLedger
+
+```mermaid
+stateDiagram-v2
+    [*] --> Created: Add VM
+    Created --> Active: Enable Monitoring
+    Active --> Monitoring: Health Checks Start
+    Monitoring --> Healthy: VM Responds
+    Monitoring --> Down: VM Not Responding
+    Down --> Healthy: VM Recovers
+    Healthy --> Down: VM Fails
+    Active --> Inactive: Disable Monitoring
+    Inactive --> Active: Re-enable
+    Active --> Deleted: Remove VM
+    Deleted --> [*]
+    
+    note right of Monitoring
+        Automatic checks
+        every 60 seconds
+    end note
+    
+    note right of Down
+        Alert sent
+        if configured
+    end note
+```
+
+## VM Information in VMLedger
+
+### Basic Information
+
+Every VM in VMLedger has these essential details:
+
+<CardGroup cols={2}>
+  <Card title="Hostname" icon="tag">
+    A friendly name for your VM
+    
+    **Example**: `web-server-prod-1`
+  </Card>
+  
+  <Card title="IP Address" icon="network-wired">
+    The network address to reach your VM
+    
+    **Example**: `192.168.1.100`
+  </Card>
+  
+  <Card title="SSH Port" icon="door-open">
+    The port for SSH connections
+    
+    **Default**: `22`
+  </Card>
+  
+  <Card title="Description" icon="file-lines">
+    Optional notes about the VM
+    
+    **Example**: "Production web server for main application"
+  </Card>
+</CardGroup>
+
+### SSH Credentials
+
+To connect to your VM and collect metrics, VMLedger needs:
+
+```mermaid
+graph LR
+    A[SSH Credentials] --> B[Username]
+    A --> C[Private Key]
+    A --> D[Port]
+    
+    B --> E[Example: ubuntu]
+    C --> F[RSA/Ed25519 Key]
+    D --> G[Default: 22]
+    
+    F --> H[Encrypted Storage]
+    H --> I[AES-256 Encryption]
+    
+    style A fill:#2196F3,color:#fff
+    style H fill:#4CAF50,color:#fff
+    style I fill:#4CAF50,color:#fff
+```
+
+<Accordion title="What is SSH?">
+  **SSH (Secure Shell)** is a secure way to connect to and control remote computers.
+  
+  **Think of it like**: A secure phone line to your VM where you can give it commands.
+  
+  **Example SSH connection**:
+  ```bash
+  ssh username@192.168.1.100
+  ```
+</Accordion>
+
+<Accordion title="Why do we need SSH credentials?">
+  VMLedger uses SSH to:
+  1. **Collect system metrics** (CPU, memory, disk usage)
+  2. **Execute commands** (optional, for deployments)
+  3. **Verify connectivity** (beyond simple ping)
+  
+  **Security**: Your SSH credentials are encrypted before storage!
+</Accordion>
+
+### Tags and Organization
+
+Use tags to organize your VMs:
+
+```mermaid
+graph TB
+    A[All VMs] --> B[Environment Tags]
+    A --> C[Role Tags]
+    A --> D[Location Tags]
+    
+    B --> B1[production]
+    B --> B2[staging]
+    B --> B3[development]
+    
+    C --> C1[web-server]
+    C --> C2[database]
+    C --> C3[cache]
+    C --> C4[load-balancer]
+    
+    D --> D1[us-east]
+    D --> D2[us-west]
+    D --> D3[eu-central]
+    
+    style A fill:#607D8B,color:#fff
+    style B fill:#4CAF50,color:#fff
+    style C fill:#2196F3,color:#fff
+    style D fill:#FF9800,color:#fff
+```
+
+**Example VM with tags**:
+```json
+{
+  "hostname": "web-server-1",
+  "ip_address": "192.168.1.100",
+  "tags": ["production", "web-server", "us-east"]
+}
+```
+
+## Adding a VM
+
+### Step-by-Step Process
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Dashboard
+    participant API
+    participant Validator
+    participant Encryptor
+    participant Database
+    
+    User->>Dashboard: Click "Add VM"
+    Dashboard->>User: Show form
+    User->>Dashboard: Fill in details
+    Dashboard->>API: POST /api/vms
+    
+    API->>Validator: Validate IP address
+    Validator-->>API: ✓ Valid
+    
+    API->>Validator: Validate SSH port
+    Validator-->>API: ✓ Valid (1-65535)
+    
+    API->>Validator: Validate SSH key format
+    Validator-->>API: ✓ Valid
+    
+    API->>Encryptor: Encrypt SSH credentials
+    Encryptor-->>API: Encrypted data
+    
+    API->>Database: Save VM record
+    Database-->>API: VM created (ID: 1)
+    
+    API-->>Dashboard: Success response
+    Dashboard-->>User: "VM added successfully!"
+```
+
+### Required Fields
+
+<Steps>
+  <Step title="Hostname">
+    A unique, descriptive name for your VM
+    
+    **Rules**:
+    - 1-255 characters
+    - Letters, numbers, hyphens
+    - No spaces
+    
+    **Good examples**:
+    - `web-server-prod-1`
+    - `db-primary-us-east`
+    - `cache-redis-staging`
+    
+    **Bad examples**:
+    - `server 1` (has space)
+    - `web_server` (use hyphens, not underscores)
+  </Step>
+  
+  <Step title="IP Address">
+    The network address of your VM
+    
+    **Supports**:
+    - IPv4: `192.168.1.100`
+    - IPv6: `2001:0db8:85a3::8a2e:0370:7334`
+    
+    **How to find your VM's IP**:
+    ```bash
+    # On Linux
+    ip addr show
+    
+    # Or
+    hostname -I
+    ```
+  </Step>
+  
+  <Step title="SSH Port">
+    The port for SSH connections
+    
+    **Default**: `22`
+    **Range**: 1-65535
+    
+    **Common custom ports**: `2222`, `22000`
+  </Step>
+  
+  <Step title="SSH Username">
+    The user account for SSH access
+    
+    **Common usernames**:
+    - `ubuntu` (Ubuntu VMs)
+    - `ec2-user` (AWS EC2)
+    - `root` (not recommended for security)
+    - `admin`
+  </Step>
+  
+  <Step title="SSH Private Key">
+    Your SSH private key for authentication
+    
+    **Format**: RSA, DSA, ECDSA, or Ed25519
+    
+    **Example key start**:
+    ```
+    -----BEGIN RSA PRIVATE KEY-----
+    MIIEpAIBAAKCAQEA...
+    ```
+    
+    <Warning>
+      Never share your private key! VMLedger encrypts it before storage.
+    </Warning>
+  </Step>
+</Steps>
+
+### Optional Fields
+
+<AccordionGroup>
+  <Accordion title="Description">
+    Add notes about this VM
+    
+    **Example**: "Production web server running Nginx and Node.js application"
+  </Accordion>
+  
+  <Accordion title="Tags">
+    Organize VMs with tags (max 20 tags per VM)
+    
+    **Example**: `production`, `web-server`, `critical`
+  </Accordion>
+  
+  <Accordion title="Is Active">
+    Enable/disable monitoring for this VM
+    
+    **Default**: Enabled
+    **Use case**: Disable monitoring for VMs under maintenance
+  </Accordion>
+</AccordionGroup>
+
+## VM States
+
+```mermaid
+graph TB
+    A[VM State] --> B{Is Active?}
+    B -->|No| C[Inactive<br/>No monitoring]
+    B -->|Yes| D{Last Ping}
+    
+    D -->|Success| E[Healthy<br/>✓ Online]
+    D -->|Failed| F[Down<br/>✗ Offline]
+    D -->|Never checked| G[Pending<br/>⏳ Waiting]
+    
+    E --> H{Metrics Available?}
+    H -->|Yes| I[Show CPU, Memory, Disk]
+    H -->|No| J[Metrics pending]
+    
+    style C fill:#9E9E9E,color:#fff
+    style E fill:#4CAF50,color:#fff
+    style F fill:#F44336,color:#fff
+    style G fill:#FF9800,color:#fff
+```
+
+### State Descriptions
+
+<Tabs>
+  <Tab title="Healthy">
+    **Status**: ✓ Online
+    
+    **Meaning**: VM is responding to ping checks
+    
+    **What VMLedger does**:
+    - Continues regular monitoring
+    - Collects system metrics
+    - No alerts sent
+    
+    **Dashboard indicator**: Green checkmark
+  </Tab>
+  
+  <Tab title="Down">
+    **Status**: ✗ Offline
+    
+    **Meaning**: VM is not responding to ping checks
+    
+    **What VMLedger does**:
+    - Records downtime
+    - Sends alert (if configured)
+    - Continues checking for recovery
+    
+    **Dashboard indicator**: Red X
+    
+    **Common causes**:
+    - VM is powered off
+    - Network issue
+    - Firewall blocking ping
+    - VM is overloaded
+  </Tab>
+  
+  <Tab title="Pending">
+    **Status**: ⏳ Waiting
+    
+    **Meaning**: VM was just added, first check hasn't run yet
+    
+    **What VMLedger does**:
+    - Waits for next monitoring cycle (up to 60 seconds)
+    - Will transition to Healthy or Down
+    
+    **Dashboard indicator**: Yellow clock
+  </Tab>
+  
+  <Tab title="Inactive">
+    **Status**: Disabled
+    
+    **Meaning**: Monitoring is disabled for this VM
+    
+    **What VMLedger does**:
+    - No health checks
+    - No metrics collection
+    - No alerts
+    
+    **Dashboard indicator**: Gray circle
+    
+    **Use cases**:
+    - VM under maintenance
+    - Temporary VM
+    - Testing environment
+  </Tab>
+</Tabs>
+
+## VM Operations
+
+### View VM Details
+
+```mermaid
+graph LR
+    A[Dashboard] --> B[VM List]
+    B --> C[Click VM]
+    C --> D[VM Details Page]
+    
+    D --> E[Basic Info]
+    D --> F[Health Status]
+    D --> G[Metrics Charts]
+    D --> H[Alert Config]
+    D --> I[Deployment History]
+    
+    style D fill:#2196F3,color:#fff
+```
+
+### Edit VM
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Dashboard
+    participant API
+    participant Database
+    
+    User->>Dashboard: Click "Edit"
+    Dashboard->>API: GET /api/vms/1
+    API->>Database: Fetch VM details
+    Database-->>API: VM data
+    API-->>Dashboard: VM data (credentials decrypted)
+    Dashboard-->>User: Show edit form
+    
+    User->>Dashboard: Update fields
+    Dashboard->>API: PUT /api/vms/1
+    API->>Database: Update VM record
+    Database-->>API: Updated
+    API-->>Dashboard: Success
+    Dashboard-->>User: "VM updated!"
+```
+
+### Delete VM
+
+<Warning>
+  Deleting a VM removes:
+  - VM record
+  - All monitoring history
+  - All metrics data
+  - All deployment records
+  - All alert configurations
+  
+  **This action cannot be undone!**
+</Warning>
+
+```mermaid
+graph TB
+    A[User clicks Delete] --> B{Confirmation}
+    B -->|Cancel| C[Return to dashboard]
+    B -->|Confirm| D[Delete VM]
+    
+    D --> E[Remove from database]
+    D --> F[Delete monitoring history]
+    D --> G[Delete metrics]
+    D --> H[Delete deployments]
+    D --> I[Delete alerts]
+    
+    E --> J[Success message]
+    F --> J
+    G --> J
+    H --> J
+    I --> J
+    
+    style B fill:#FF9800,color:#fff
+    style D fill:#F44336,color:#fff
+    style J fill:#4CAF50,color:#fff
+```
+
+## VM Credentials Security
+
+### How Credentials are Protected
+
+```mermaid
+graph TB
+    A[SSH Private Key] --> B[User Input]
+    B --> C[Frontend Validation]
+    C --> D[API Receives Key]
+    
+    D --> E[Generate User Salt]
+    E --> F[Combine with Master Key]
+    F --> G[AES-256 Encryption]
+    
+    G --> H[Encrypted Blob]
+    H --> I[Store in PostgreSQL]
+    
+    J[Need to Use Key] --> K[Retrieve from Database]
+    K --> L[Decrypt with Master Key + Salt]
+    L --> M[Use for SSH Connection]
+    M --> N[Discard from Memory]
+    
+    style G fill:#4CAF50,color:#fff
+    style I fill:#2196F3,color:#fff
+    style L fill:#FF9800,color:#fff
+```
+
+<AccordionGroup>
+  <Accordion title="Encryption at Rest">
+    Your SSH credentials are encrypted before being saved to the database.
+    
+    **Algorithm**: AES-256 (Advanced Encryption Standard)
+    **Key**: Master key + user-specific salt
+    
+    **What this means**: Even if someone gains access to the database, they cannot read your SSH keys without the master encryption key.
+  </Accordion>
+  
+  <Accordion title="Encryption in Transit">
+    When credentials are sent from your browser to the API:
+    
+    **Protocol**: HTTPS (in production)
+    **Effect**: Data is encrypted during transmission
+    
+    **What this means**: No one can intercept your credentials while they're being sent.
+  </Accordion>
+  
+  <Accordion title="Decryption Only When Needed">
+    Credentials are decrypted only when:
+    1. Displaying in edit form (to you, the owner)
+    2. Making SSH connection for metrics
+    
+    **What this means**: Credentials spend minimal time in decrypted form.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+### Naming Conventions
+
+<Tabs>
+  <Tab title="Environment-Based">
+    ```
+    web-server-prod-1
+    web-server-staging-1
+    web-server-dev-1
+    ```
+    
+    **Pattern**: `{role}-{environment}-{number}`
+  </Tab>
+  
+  <Tab title="Location-Based">
+    ```
+    web-us-east-1
+    web-us-west-1
+    web-eu-central-1
+    ```
+    
+    **Pattern**: `{role}-{location}-{number}`
+  </Tab>
+  
+  <Tab title="Function-Based">
+    ```
+    nginx-load-balancer-1
+    postgres-primary-db
+    redis-cache-1
+    ```
+    
+    **Pattern**: `{software}-{function}-{number}`
+  </Tab>
+</Tabs>
+
+### Tagging Strategy
+
+<CardGroup cols={2}>
+  <Card title="Environment Tags" icon="layer-group">
+    - `production`
+    - `staging`
+    - `development`
+    - `testing`
+  </Card>
+  
+  <Card title="Role Tags" icon="briefcase">
+    - `web-server`
+    - `database`
+    - `cache`
+    - `load-balancer`
+    - `worker`
+  </Card>
+  
+  <Card title="Criticality Tags" icon="exclamation">
+    - `critical`
+    - `important`
+    - `standard`
+    - `low-priority`
+  </Card>
+  
+  <Card title="Team Tags" icon="users">
+    - `team-frontend`
+    - `team-backend`
+    - `team-devops`
+    - `team-data`
+  </Card>
+</CardGroup>
+
+### Security Best Practices
+
+<Steps>
+  <Step title="Use SSH Keys, Not Passwords">
+    SSH keys are more secure than passwords
+    
+    **Generate a key pair**:
+    ```bash
+    ssh-keygen -t ed25519 -C "vmledger@example.com"
+    ```
+  </Step>
+  
+  <Step title="Use Dedicated SSH User">
+    Create a specific user for VMLedger monitoring
+    
+    ```bash
+    # On your VM
+    sudo adduser vmledger-monitor
+    sudo usermod -aG sudo vmledger-monitor
+    ```
+  </Step>
+  
+  <Step title="Limit SSH Permissions">
+    Give VMLedger user only necessary permissions
+    
+    **Read-only access** is sufficient for monitoring
+  </Step>
+  
+  <Step title="Rotate Keys Regularly">
+    Change SSH keys periodically (e.g., every 90 days)
+  </Step>
+  
+  <Step title="Use Non-Standard SSH Port">
+    Change from default port 22 to reduce automated attacks
+    
+    ```bash
+    # In /etc/ssh/sshd_config
+    Port 2222
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Cannot add VM - Invalid IP address">
+    **Problem**: IP address validation fails
+    
+    **Solutions**:
+    - Verify IP format: `192.168.1.100` (IPv4) or `2001:db8::1` (IPv6)
+    - Remove any spaces or extra characters
+    - Ensure IP is reachable from VMLedger server
+  </Accordion>
+  
+  <Accordion title="Cannot add VM - Invalid SSH key">
+    **Problem**: SSH key format not recognized
+    
+    **Solutions**:
+    - Ensure key starts with `-----BEGIN ... PRIVATE KEY-----`
+    - Include the entire key (header, body, footer)
+    - Check for supported formats: RSA, DSA, ECDSA, Ed25519
+    - Remove any extra whitespace
+  </Accordion>
+  
+  <Accordion title="VM shows as Down but it's running">
+    **Problem**: Ping checks fail even though VM is online
+    
+    **Possible causes**:
+    1. **Firewall blocking ICMP**: Allow ping from VMLedger server
+    2. **Network issue**: Check network connectivity
+    3. **VM overloaded**: Check CPU/memory usage
+    
+    **Test manually**:
+    ```bash
+    ping -c 4 192.168.1.100
+    ```
+  </Accordion>
+  
+  <Accordion title="Metrics not collecting">
+    **Problem**: No CPU/memory/disk data shown
+    
+    **Possible causes**:
+    1. **SSH connection failed**: Verify credentials
+    2. **SSH port blocked**: Check firewall rules
+    3. **Wrong username**: Verify SSH username
+    4. **Key permissions**: Ensure private key is valid
+    
+    **Test SSH manually**:
+    ```bash
+    ssh -i /path/to/key username@192.168.1.100
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monitoring" icon="heart-pulse" href="/concepts/monitoring">
+    Learn how VMLedger monitors your VMs
+  </Card>
+  
+  <Card title="Alerts" icon="bell" href="/features/alerting">
+    Set up notifications for VM issues
+  </Card>
+  
+  <Card title="Deployments" icon="rocket" href="/concepts/deployments">
+    Track changes to your VMs
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/virtual-machines">
+    Manage VMs programmatically
+  </Card>
+</CardGroup>
