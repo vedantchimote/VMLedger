@@ -1,0 +1,370 @@
+---
+title: 'Installation'
+description: 'Detailed installation guide for VMLedger'
+---
+
+## System Requirements
+
+### Minimum Requirements
+- **CPU**: 2 cores
+- **RAM**: 4 GB
+- **Disk**: 20 GB free space
+- **OS**: Linux, macOS, or Windows with WSL2
+
+### Recommended Requirements
+- **CPU**: 4+ cores
+- **RAM**: 8+ GB
+- **Disk**: 50+ GB SSD
+- **OS**: Ubuntu 22.04 LTS or similar
+
+## Installation Methods
+
+<CardGroup cols={2}>
+  <Card
+    title="Docker Compose"
+    icon="docker"
+    href="#docker-compose-installation"
+  >
+    Recommended for development and production
+  </Card>
+  <Card
+    title="Manual Installation"
+    icon="terminal"
+    href="#manual-installation"
+  >
+    For custom setups and development
+  </Card>
+</CardGroup>
+
+## Docker Compose Installation
+
+### 1. Install Docker
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    # Update package index
+    sudo apt-get update
+
+    # Install dependencies
+    sudo apt-get install ca-certificates curl gnupg
+
+    # Add Docker's official GPG key
+    sudo install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+    # Set up repository
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    # Install Docker Engine
+    sudo apt-get update
+    sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    ```
+  </Tab>
+  <Tab title="macOS">
+    ```bash
+    # Install using Homebrew
+    brew install --cask docker
+
+    # Or download Docker Desktop from:
+    # https://www.docker.com/products/docker-desktop
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```powershell
+    # Install Docker Desktop for Windows
+    # Download from: https://www.docker.com/products/docker-desktop
+
+    # Or use Chocolatey
+    choco install docker-desktop
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Clone Repository
+
+```bash
+git clone https://github.com/yourusername/vmledger.git
+cd vmledger
+```
+
+### 3. Configure Environment
+
+```bash
+# Copy example environment file
+cp .env.example .env
+
+# Edit .env file
+nano .env  # or use your preferred editor
+```
+
+<Accordion title="Required Environment Variables">
+  ```bash
+  # Application
+  APP_NAME=VMLedger
+  DEBUG=False
+  LOG_LEVEL=INFO
+
+  # Security (CHANGE IN PRODUCTION!)
+  SECRET_KEY=your-secret-key-minimum-32-characters
+  ENCRYPTION_MASTER_KEY=your-encryption-key-32-characters
+
+  # Database
+  DATABASE_URL=postgresql://vmledger:secure_password@postgres:5432/vmledger
+  DATABASE_POOL_SIZE=5
+  DATABASE_MAX_OVERFLOW=20
+
+  # Redis
+  REDIS_URL=redis://redis:6379/0
+
+  # JWT
+  JWT_ALGORITHM=HS256
+  JWT_EXPIRATION_HOURS=24
+
+  # Monitoring
+  PING_INTERVAL_SECONDS=60
+  METRICS_INTERVAL_SECONDS=300
+  ALERT_COOLDOWN_MINUTES=15
+
+  # SSH
+  SSH_CONNECTION_TIMEOUT=10
+  SSH_COMMAND_TIMEOUT=30
+
+  # CORS
+  CORS_ORIGINS=http://localhost:3000
+  ```
+</Accordion>
+
+### 4. Start Services
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Check status
+docker-compose ps
+```
+
+### 5. Run Migrations
+
+```bash
+docker-compose exec api alembic upgrade head
+```
+
+### 6. Install Frontend Dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### 7. Configure Frontend
+
+```bash
+# Copy frontend environment file
+cp .env.example .env.local
+
+# Edit .env.local
+nano .env.local
+```
+
+Add:
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### 8. Start Frontend
+
+```bash
+npm run dev
+```
+
+<Check>
+  VMLedger is now running at:
+  - Frontend: http://localhost:3000
+  - Backend API: http://localhost:8000
+  - API Docs: http://localhost:8000/docs
+</Check>
+
+## Manual Installation
+
+### Prerequisites
+
+```bash
+# Python 3.11+
+python3 --version
+
+# Node.js 18+
+node --version
+
+# PostgreSQL 15+
+psql --version
+
+# Redis 7+
+redis-cli --version
+```
+
+### Backend Setup
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up database
+createdb vmledger
+
+# Run migrations
+alembic upgrade head
+
+# Start API server
+uvicorn vmledger.main:app --host 0.0.0.0 --port 8000 --reload
+
+# In another terminal, start Celery worker
+celery -A vmledger.celery_app worker --loglevel=info
+
+# In another terminal, start Celery beat
+celery -A vmledger.celery_app beat --loglevel=info
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+## Verification
+
+### Check Backend Health
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+```json
+{
+  "status": "healthy",
+  "database": "connected",
+  "redis": "connected"
+}
+```
+
+### Check Frontend
+
+Open browser to `http://localhost:3000` - you should see the login page.
+
+### Check Celery Workers
+
+```bash
+docker-compose logs celery-worker
+```
+
+Look for: `celery@hostname ready`
+
+## Post-Installation
+
+### Create Admin User
+
+```bash
+# Using the API
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "email": "admin@example.com",
+    "password": "SecurePass123!"
+  }'
+```
+
+### Configure Monitoring
+
+Edit `vmledger/config.py` to adjust monitoring intervals:
+
+```python
+PING_INTERVAL_SECONDS = 60  # Ping check frequency
+METRICS_INTERVAL_SECONDS = 300  # Metrics collection frequency
+ALERT_COOLDOWN_MINUTES = 15  # Alert cooldown period
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Port already in use">
+    ```bash
+    # Check what's using the port
+    lsof -i :8000  # On Linux/macOS
+    netstat -ano | findstr :8000  # On Windows
+
+    # Change port in docker-compose.yml or .env
+    ```
+  </Accordion>
+
+  <Accordion title="Database connection failed">
+    ```bash
+    # Check PostgreSQL is running
+    docker-compose ps postgres
+
+    # Check logs
+    docker-compose logs postgres
+
+    # Verify credentials in .env match docker-compose.yml
+    ```
+  </Accordion>
+
+  <Accordion title="Redis connection failed">
+    ```bash
+    # Check Redis is running
+    docker-compose ps redis
+
+    # Test connection
+    docker-compose exec redis redis-cli ping
+    # Should return: PONG
+    ```
+  </Accordion>
+
+  <Accordion title="Frontend can't connect to API">
+    ```bash
+    # Check NEXT_PUBLIC_API_URL in frontend/.env.local
+    # Should be: http://localhost:8000
+
+    # Check CORS settings in backend .env
+    # CORS_ORIGINS should include http://localhost:3000
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Configuration"
+    icon="gear"
+    href="/configuration"
+  >
+    Configure VMLedger for your environment
+  </Card>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Start using VMLedger
+  </Card>
+</CardGroup>

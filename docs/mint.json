@@ -1,0 +1,142 @@
+{
+  "name": "VMLedger Documentation",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@vmledger.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "http://localhost:3000"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    },
+    {
+      "name": "Architecture",
+      "url": "architecture"
+    },
+    {
+      "name": "Development",
+      "url": "development"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/yourusername/vmledger"
+    },
+    {
+      "name": "Community",
+      "icon": "slack",
+      "url": "https://vmledger.slack.com"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Get Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "installation",
+        "configuration"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "concepts/overview",
+        "concepts/virtual-machines",
+        "concepts/monitoring",
+        "concepts/authentication",
+        "concepts/deployments",
+        "concepts/alerts"
+      ]
+    },
+    {
+      "group": "Features",
+      "pages": [
+        "features/vm-management",
+        "features/health-monitoring",
+        "features/alerting",
+        "features/search-engine",
+        "features/deployment-tracking"
+      ]
+    },
+    {
+      "group": "API Documentation",
+      "pages": [
+        "api-reference/introduction",
+        "api-reference/authentication",
+        "api-reference/virtual-machines",
+        "api-reference/monitoring",
+        "api-reference/deployments",
+        "api-reference/alerts",
+        "api-reference/search"
+      ]
+    },
+    {
+      "group": "Architecture",
+      "pages": [
+        "architecture/overview",
+        "architecture/backend",
+        "architecture/frontend",
+        "architecture/database",
+        "architecture/caching",
+        "architecture/task-queue",
+        "architecture/security"
+      ]
+    },
+    {
+      "group": "Development",
+      "pages": [
+        "development/setup",
+        "development/docker",
+        "development/testing",
+        "development/contributing",
+        "development/troubleshooting"
+      ]
+    },
+    {
+      "group": "Deployment",
+      "pages": [
+        "deployment/overview",
+        "deployment/docker-compose",
+        "deployment/production",
+        "deployment/environment-variables"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/adding-vms",
+        "guides/setting-up-monitoring",
+        "guides/configuring-alerts",
+        "guides/managing-deployments",
+        "guides/password-fix"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/yourusername/vmledger",
+    "linkedin": "https://www.linkedin.com/company/vmledger"
+  }
+}

@@ -1,0 +1,188 @@
+---
+title: Introduction
+description: 'Welcome to VMLedger - Your Virtual Machine Management Platform'
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Hero Dark"
+/>
+
+## What is VMLedger?
+
+VMLedger is a comprehensive virtual machine management platform designed to help infrastructure teams monitor, manage, and track their VM deployments across multiple environments.
+
+<CardGroup cols={2}>
+  <Card
+    title="VM Management"
+    icon="server"
+    href="/features/vm-management"
+  >
+    Centralized management of all your virtual machines with SSH connectivity
+  </Card>
+  <Card
+    title="Health Monitoring"
+    icon="heart-pulse"
+    href="/features/health-monitoring"
+  >
+    Real-time health checks with automated ping monitoring and metrics collection
+  </Card>
+  <Card
+    title="Smart Alerting"
+    icon="bell"
+    href="/features/alerting"
+  >
+    Intelligent alerting system with webhook notifications and cooldown periods
+  </Card>
+  <Card
+    title="Deployment Tracking"
+    icon="rocket"
+    href="/features/deployment-tracking"
+  >
+    Track deployments with detailed notes and historical records
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### 🖥️ Virtual Machine Management
+- Add and manage VMs with IP addresses, SSH credentials, and metadata
+- Secure credential storage with encryption
+- Tag-based organization and filtering
+- Bulk operations support
+
+### 📊 Real-Time Monitoring
+- Automated ping checks every 60 seconds
+- System metrics collection (CPU, memory, disk, network)
+- Historical data tracking and visualization
+- Customizable monitoring intervals
+
+### 🔔 Intelligent Alerting
+- Webhook-based notifications (Slack, Discord, custom endpoints)
+- Configurable cooldown periods to prevent alert fatigue
+- Alert history and acknowledgment tracking
+- Multiple alert channels per VM
+
+### 🚀 Deployment Management
+- Track deployments with timestamps and notes
+- Link deployments to specific VMs
+- Deployment history and rollback tracking
+- Support for up to 50,000 characters in deployment notes
+
+### 🔍 Advanced Search
+- Full-text search across VMs, deployments, and alerts
+- Filter by tags, status, and date ranges
+- Fast search with Redis caching
+- Fuzzy matching support
+
+### 🔐 Security First
+- JWT-based authentication with 24-hour sessions
+- Bcrypt password hashing (cost factor 12)
+- Rate limiting and account lockout protection
+- Encrypted credential storage
+- Comprehensive audit logging
+
+## Technology Stack
+
+<CardGroup cols={3}>
+  <Card title="Backend" icon="python">
+    FastAPI, SQLAlchemy, Celery
+  </Card>
+  <Card title="Frontend" icon="react">
+    Next.js 14, React, TailwindCSS
+  </Card>
+  <Card title="Database" icon="database">
+    PostgreSQL, Redis
+  </Card>
+</CardGroup>
+
+### Backend
+- **Framework**: FastAPI (Python 3.11+)
+- **ORM**: SQLAlchemy 2.0
+- **Task Queue**: Celery with Redis broker
+- **Authentication**: JWT with python-jose
+- **SSH**: Paramiko for remote connections
+
+### Frontend
+- **Framework**: Next.js 14 with App Router
+- **UI Library**: React 18
+- **Styling**: TailwindCSS
+- **State Management**: React Query (TanStack Query)
+- **API Client**: Axios
+
+### Infrastructure
+- **Database**: PostgreSQL 15
+- **Cache**: Redis 7
+- **Deployment**: Docker Compose
+- **Monitoring**: Celery Beat for scheduled tasks
+
+## Quick Links
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get VMLedger up and running in 5 minutes
+  </Card>
+  <Card
+    title="Installation Guide"
+    icon="download"
+    href="/installation"
+  >
+    Detailed installation instructions for all environments
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Complete API documentation with examples
+  </Card>
+  <Card
+    title="Architecture"
+    icon="diagram-project"
+    href="/architecture/overview"
+  >
+    Learn about VMLedger's architecture and design
+  </Card>
+</CardGroup>
+
+## Use Cases
+
+### Infrastructure Teams
+- Monitor health of production VMs
+- Track deployments across environments
+- Receive alerts for VM failures
+- Maintain SSH credential inventory
+
+### DevOps Engineers
+- Automate VM health checks
+- Integrate with CI/CD pipelines
+- Track deployment history
+- Monitor system metrics
+
+### System Administrators
+- Centralized VM management
+- Quick SSH access to VMs
+- Alert management and acknowledgment
+- Search and filter VM inventory
+
+## Getting Started
+
+Ready to get started? Check out our [Quick Start Guide](/quickstart) to set up VMLedger in minutes.
+
+<Card
+  title="Quick Start →"
+  icon="play"
+  href="/quickstart"
+>
+  Follow our step-by-step guide to deploy VMLedger
+</Card>

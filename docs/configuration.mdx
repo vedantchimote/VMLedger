@@ -1,0 +1,486 @@
+---
+title: 'Configuration'
+description: 'Configure VMLedger for your environment'
+---
+
+## Environment Variables
+
+VMLedger uses environment variables for configuration. Create a `.env` file in the root directory.
+
+### Application Settings
+
+```bash
+# Application Identity
+APP_NAME=VMLedger
+APP_VERSION=1.0.0
+DEBUG=False  # Set to True only in development
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+<Warning>
+  Never set `DEBUG=True` in production environments
+</Warning>
+
+### Security Settings
+
+```bash
+# Secret Keys (CHANGE THESE IN PRODUCTION!)
+SECRET_KEY=your-secret-key-minimum-32-characters-long
+ENCRYPTION_MASTER_KEY=your-encryption-key-32-characters-long
+
+# JWT Configuration
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=24
+
+# Password Policy
+PASSWORD_MIN_LENGTH=12
+MAX_LOGIN_ATTEMPTS=5
+ACCOUNT_LOCKOUT_MINUTES=30
+```
+
+<Accordion title="Generating Secure Keys">
+  ```bash
+  # Generate SECRET_KEY
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  
+  # Generate ENCRYPTION_MASTER_KEY
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  ```
+</Accordion>
+
+### Database Configuration
+
+```bash
+# PostgreSQL Connection
+DATABASE_URL=postgresql://username:password@host:port/database
+DATABASE_POOL_SIZE=5
+DATABASE_MAX_OVERFLOW=20
+DATABASE_POOL_TIMEOUT=30
+DATABASE_POOL_RECYCLE=3600
+```
+
+<Tabs>
+  <Tab title="Development">
+    ```bash
+    DATABASE_URL=postgresql://vmledger:vmledger_dev_password@localhost:5432/vmledger
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    ```bash
+    DATABASE_URL=postgresql://vmledger:vmledger_dev_password@postgres:5432/vmledger
+    ```
+  </Tab>
+  
+  <Tab title="Production">
+    ```bash
+    DATABASE_URL=postgresql://vmledger:secure_password@db.example.com:5432/vmledger
+    DATABASE_POOL_SIZE=10
+    DATABASE_MAX_OVERFLOW=40
+    ```
+  </Tab>
+</Tabs>
+
+### Redis Configuration
+
+```bash
+# Redis Connection
+REDIS_URL=redis://host:port/db
+REDIS_PASSWORD=your-redis-password  # Optional
+REDIS_MAX_CONNECTIONS=50
+```
+
+<Tabs>
+  <Tab title="Development">
+    ```bash
+    REDIS_URL=redis://localhost:6379/0
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    ```bash
+    REDIS_URL=redis://redis:6379/0
+    ```
+  </Tab>
+  
+  <Tab title="Production">
+    ```bash
+    REDIS_URL=redis://redis.example.com:6379/0
+    REDIS_PASSWORD=secure_redis_password
+    ```
+  </Tab>
+</Tabs>
+
+### API Settings
+
+```bash
+# API Server
+API_HOST=0.0.0.0
+API_PORT=8000
+API_WORKERS=4  # Number of Uvicorn workers
+
+# CORS Configuration
+CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
+CORS_ALLOW_CREDENTIALS=True
+CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,PATCH
+CORS_ALLOW_HEADERS=*
+```
+
+### Monitoring Settings
+
+```bash
+# Health Check Intervals
+PING_INTERVAL_SECONDS=60  # How often to ping VMs
+METRICS_INTERVAL_SECONDS=300  # How often to collect metrics
+
+# Alert Configuration
+ALERT_COOLDOWN_MINUTES=15  # Minimum time between alerts
+CONCURRENT_WORKERS=10  # Number of concurrent monitoring tasks
+```
+
+<Info>
+  Adjust intervals based on your monitoring needs and system load
+</Info>
+
+### SSH Settings
+
+```bash
+# SSH Connection Parameters
+SSH_CONNECTION_TIMEOUT=10  # Seconds
+SSH_COMMAND_TIMEOUT=30  # Seconds
+SSH_MAX_RETRIES=3
+SSH_RETRY_DELAY=5  # Seconds between retries
+```
+
+### Celery Settings
+
+```bash
+# Celery Configuration
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+CELERY_TASK_SERIALIZER=json
+CELERY_RESULT_SERIALIZER=json
+CELERY_ACCEPT_CONTENT=json
+CELERY_TIMEZONE=UTC
+CELERY_ENABLE_UTC=True
+```
+
+## Frontend Configuration
+
+Create `frontend/.env.local`:
+
+```bash
+# API Endpoint
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Application Settings
+NEXT_PUBLIC_APP_NAME=VMLedger
+NEXT_PUBLIC_APP_VERSION=1.0.0
+
+# Feature Flags
+NEXT_PUBLIC_ENABLE_ANALYTICS=false
+NEXT_PUBLIC_ENABLE_DEBUG=false
+```
+
+<Tabs>
+  <Tab title="Development">
+    ```bash
+    NEXT_PUBLIC_API_URL=http://localhost:8000
+    NEXT_PUBLIC_ENABLE_DEBUG=true
+    ```
+  </Tab>
+  
+  <Tab title="Production">
+    ```bash
+    NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+    NEXT_PUBLIC_ENABLE_ANALYTICS=true
+    NEXT_PUBLIC_ENABLE_DEBUG=false
+    ```
+  </Tab>
+</Tabs>
+
+## Docker Compose Configuration
+
+### Development (docker-compose.yml)
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: vmledger
+      POSTGRES_PASSWORD: vmledger_dev_password
+      POSTGRES_DB: vmledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://vmledger:vmledger_dev_password@postgres:5432/vmledger
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-key
+      DEBUG: "True"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+### Production (docker-compose.prod.yml)
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: "False"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## Configuration Best Practices
+
+### Security
+
+<AccordionGroup>
+  <Accordion title="1. Use Strong Secrets">
+    - Generate random keys with at least 32 characters
+    - Never commit secrets to version control
+    - Rotate secrets regularly
+    - Use different secrets for each environment
+  </Accordion>
+  
+  <Accordion title="2. Restrict CORS Origins">
+    ```bash
+    # Bad - allows all origins
+    CORS_ORIGINS=*
+    
+    # Good - specific origins only
+    CORS_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Disable Debug in Production">
+    ```bash
+    # Development
+    DEBUG=True
+    LOG_LEVEL=DEBUG
+    
+    # Production
+    DEBUG=False
+    LOG_LEVEL=INFO
+    ```
+  </Accordion>
+  
+  <Accordion title="4. Use Environment-Specific Passwords">
+    Never use the same database password across environments
+  </Accordion>
+</AccordionGroup>
+
+### Performance
+
+<AccordionGroup>
+  <Accordion title="1. Database Connection Pooling">
+    ```bash
+    # Adjust based on expected load
+    DATABASE_POOL_SIZE=10  # Connections per worker
+    DATABASE_MAX_OVERFLOW=20  # Additional connections when needed
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Redis Connection Limits">
+    ```bash
+    # Increase for high-traffic applications
+    REDIS_MAX_CONNECTIONS=100
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Monitoring Intervals">
+    ```bash
+    # Balance between freshness and load
+    PING_INTERVAL_SECONDS=60  # More frequent = more load
+    METRICS_INTERVAL_SECONDS=300  # Less frequent for expensive operations
+    ```
+  </Accordion>
+  
+  <Accordion title="4. Celery Workers">
+    ```bash
+    # Scale based on task volume
+    CONCURRENT_WORKERS=10  # Per Celery worker process
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Reliability
+
+<AccordionGroup>
+  <Accordion title="1. Timeouts">
+    ```bash
+    # Prevent hanging connections
+    SSH_CONNECTION_TIMEOUT=10
+    SSH_COMMAND_TIMEOUT=30
+    DATABASE_POOL_TIMEOUT=30
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Retries">
+    ```bash
+    # Automatic retry for transient failures
+    SSH_MAX_RETRIES=3
+    SSH_RETRY_DELAY=5
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Alert Cooldowns">
+    ```bash
+    # Prevent alert fatigue
+    ALERT_COOLDOWN_MINUTES=15
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Validation
+
+### Check Configuration
+
+```bash
+# Verify environment variables are loaded
+docker-compose exec api python -c "from vmledger.config import settings; print(settings.dict())"
+
+# Test database connection
+docker-compose exec api python -c "from vmledger.database import engine; engine.connect()"
+
+# Test Redis connection
+docker-compose exec api python -c "import redis; r = redis.from_url('redis://redis:6379/0'); print(r.ping())"
+```
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Database connection failed">
+    - Verify `DATABASE_URL` format
+    - Check PostgreSQL is running
+    - Verify credentials
+    - Check network connectivity
+  </Accordion>
+  
+  <Accordion title="Redis connection failed">
+    - Verify `REDIS_URL` format
+    - Check Redis is running
+    - Verify password if set
+    - Check network connectivity
+  </Accordion>
+  
+  <Accordion title="CORS errors">
+    - Add frontend URL to `CORS_ORIGINS`
+    - Ensure no trailing slashes
+    - Check protocol (http vs https)
+  </Accordion>
+  
+  <Accordion title="JWT token errors">
+    - Verify `SECRET_KEY` is set
+    - Check `JWT_EXPIRATION_HOURS`
+    - Ensure consistent secret across instances
+  </Accordion>
+</AccordionGroup>
+
+## Environment-Specific Configurations
+
+### Development
+
+```bash
+DEBUG=True
+LOG_LEVEL=DEBUG
+CORS_ORIGINS=http://localhost:3000
+DATABASE_URL=postgresql://vmledger:dev_password@localhost:5432/vmledger
+REDIS_URL=redis://localhost:6379/0
+```
+
+### Staging
+
+```bash
+DEBUG=False
+LOG_LEVEL=INFO
+CORS_ORIGINS=https://staging.yourdomain.com
+DATABASE_URL=postgresql://vmledger:staging_password@staging-db:5432/vmledger
+REDIS_URL=redis://staging-redis:6379/0
+```
+
+### Production
+
+```bash
+DEBUG=False
+LOG_LEVEL=WARNING
+CORS_ORIGINS=https://app.yourdomain.com
+DATABASE_URL=postgresql://vmledger:prod_password@prod-db:5432/vmledger
+REDIS_URL=redis://:redis_password@prod-redis:6379/0
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Start using VMLedger with your configuration
+  </Card>
+  
+  <Card
+    title="Deployment"
+    icon="server"
+    href="/deployment/overview"
+  >
+    Deploy VMLedger to production
+  </Card>
+</CardGroup>

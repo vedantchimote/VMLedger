@@ -1,0 +1,247 @@
+---
+title: 'Quick Start'
+description: 'Get VMLedger up and running in 5 minutes'
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Docker" icon="docker">
+    Version 20.10 or higher
+  </Card>
+  <Card title="Docker Compose" icon="layer-group">
+    Version 2.0 or higher
+  </Card>
+  <Card title="Node.js" icon="node">
+    Version 18 or higher (for frontend)
+  </Card>
+  <Card title="Git" icon="git">
+    For cloning the repository
+  </Card>
+</CardGroup>
+
+## Step 1: Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/vmledger.git
+cd vmledger
+```
+
+## Step 2: Configure Environment Variables
+
+Create a `.env` file in the root directory:
+
+```bash
+cp .env.example .env
+```
+
+Update the following critical variables:
+
+```bash
+# Security (CHANGE THESE IN PRODUCTION!)
+SECRET_KEY=your-secret-key-here
+ENCRYPTION_MASTER_KEY=your-encryption-key-here
+
+# Database
+DATABASE_URL=postgresql://vmledger:vmledger_dev_password@postgres:5432/vmledger
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# API Settings
+API_HOST=0.0.0.0
+API_PORT=8000
+```
+
+<Warning>
+  **Security Notice**: Always change `SECRET_KEY` and `ENCRYPTION_MASTER_KEY` in production environments. Use strong, randomly generated keys.
+</Warning>
+
+## Step 3: Start Backend Services
+
+Launch all backend services using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+This will start:
+- PostgreSQL database (port 5432)
+- Redis cache (port 6379)
+- FastAPI backend (port 8000)
+- Celery worker
+- Celery beat scheduler
+
+<Tip>
+  Use `docker-compose ps` to verify all containers are running
+</Tip>
+
+## Step 4: Run Database Migrations
+
+Apply database migrations to set up the schema:
+
+```bash
+docker-compose exec api alembic upgrade head
+```
+
+## Step 5: Start Frontend
+
+Navigate to the frontend directory and start the development server:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will be available at `http://localhost:3000`
+
+## Step 6: Create Your First User
+
+Open your browser and navigate to:
+
+```
+http://localhost:3000/register
+```
+
+Create an account with:
+- **Username**: Your desired username
+- **Email**: Your email address
+- **Password**: Must meet complexity requirements (12+ chars, mixed case, numbers, special chars)
+
+<Note>
+  Password must be 12-72 bytes with uppercase, lowercase, numbers, and special characters
+</Note>
+
+## Step 7: Add Your First VM
+
+After logging in:
+
+1. Click **"Add VM"** in the dashboard
+2. Fill in the VM details:
+   - **Hostname**: VM identifier
+   - **IP Address**: IPv4 or IPv6
+   - **SSH Port**: Default 22
+   - **SSH Username**: For remote access
+   - **SSH Private Key**: Paste your private key
+   - **Tags**: Optional tags for organization
+
+3. Click **"Create VM"**
+
+## Step 8: Verify Monitoring
+
+Once your VM is added:
+
+1. Navigate to the **Dashboard**
+2. You should see your VM with health status
+3. Monitoring will start automatically within 60 seconds
+4. Check the **Monitoring** tab for metrics
+
+<Check>
+  **Success!** Your VMLedger instance is now running and monitoring your VMs
+</Check>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Configure Alerts"
+    icon="bell"
+    href="/guides/configuring-alerts"
+  >
+    Set up webhook notifications for VM failures
+  </Card>
+  <Card
+    title="Track Deployments"
+    icon="rocket"
+    href="/guides/managing-deployments"
+  >
+    Learn how to track deployments to your VMs
+  </Card>
+  <Card
+    title="API Integration"
+    icon="code"
+    href="/api-reference/introduction"
+  >
+    Integrate VMLedger with your existing tools
+  </Card>
+  <Card
+    title="Production Deployment"
+    icon="server"
+    href="/deployment/production"
+  >
+    Deploy VMLedger to production
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Backend not starting?
+
+Check the logs:
+```bash
+docker-compose logs api
+```
+
+### Frontend build errors?
+
+Clear node_modules and reinstall:
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Database connection issues?
+
+Verify PostgreSQL is running:
+```bash
+docker-compose ps postgres
+```
+
+### Password registration failing?
+
+See our [Password Fix Guide](/guides/password-fix) for bcrypt compatibility issues.
+
+## Common Commands
+
+```bash
+# View all container logs
+docker-compose logs -f
+
+# Restart a specific service
+docker-compose restart api
+
+# Stop all services
+docker-compose down
+
+# Rebuild containers
+docker-compose build
+
+# View API logs only
+docker-compose logs -f api
+
+# Access database
+docker-compose exec postgres psql -U vmledger -d vmledger
+```
+
+## Need Help?
+
+<CardGroup cols={2}>
+  <Card
+    title="Troubleshooting Guide"
+    icon="wrench"
+    href="/development/troubleshooting"
+  >
+    Common issues and solutions
+  </Card>
+  <Card
+    title="GitHub Issues"
+    icon="github"
+    href="https://github.com/yourusername/vmledger/issues"
+  >
+    Report bugs or request features
+  </Card>
+</CardGroup>
