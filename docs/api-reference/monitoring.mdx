@@ -1,0 +1,255 @@
+---
+title: 'Monitoring API'
+description: 'Access health check results and resource metrics for your VMs'
+icon: 'chart-line'
+api: 'GET /api/vms/{vm_id}/status'
+---
+
+## Overview
+
+The Monitoring API provides access to health check results (ping history) and resource metrics (CPU, RAM, disk usage) collected from your VMs.
+
+## Get VM Status
+
+<api method="GET" endpoint="/api/vms/{vm_id}/status" />
+
+Get current status and latest metrics for a VM.
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "vm_id": 123,
+    "hostname": "web-server-01",
+    "is_reachable": true,
+    "last_seen": "2026-05-08T10:35:00Z",
+    "latest_ping": {
+      "timestamp": "2026-05-08T10:35:00Z",
+      "success": true,
+      "response_time_ms": 5.2,
+      "icmp_success": true,
+      "tcp_success": true
+    },
+    "latest_metrics": {
+      "timestamp": "2026-05-08T10:30:00Z",
+      "cpu_usage_percent": 45.2,
+      "ram_used_mb": 2048,
+      "ram_total_mb": 4096,
+      "disk_used_gb": 67.5,
+      "disk_total_gb": 100.0,
+      "disk_usage_percent": 67.5
+    }
+  }
+}
+```
+
+---
+
+## Get Ping History
+
+<api method="GET" endpoint="/api/vms/{vm_id}/ping" />
+
+Retrieve ping check history (last 100 results).
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| limit | integer | Number of results (default: 100, max: 100) |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1001,
+      "vm_id": 123,
+      "timestamp": "2026-05-08T10:35:00Z",
+      "success": true,
+      "response_time_ms": 5.2,
+      "error_type": null,
+      "icmp_success": true,
+      "tcp_success": true
+    },
+    {
+      "id": 1000,
+      "vm_id": 123,
+      "timestamp": "2026-05-08T10:34:00Z",
+      "success": false,
+      "response_time_ms": null,
+      "error_type": "TIMEOUT",
+      "icmp_success": false,
+      "tcp_success": false
+    }
+  ]
+}
+```
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+# Get last 50 ping results
+curl "http://localhost:8000/api/vms/123/ping?limit=50" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.get(
+    f"http://localhost:8000/api/vms/{vm_id}/ping",
+    params={"limit": 50},
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+pings = response.json()['data']
+success_rate = sum(1 for p in pings if p['success']) / len(pings) * 100
+print(f"Success rate: {success_rate:.1f}%")
+```
+
+```javascript JavaScript
+const response = await fetch(
+  `http://localhost:8000/api/vms/${vmId}/ping?limit=50`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+);
+
+const pings = await response.json().data;
+const successRate = pings.filter(p => p.success).length / pings.length * 100;
+console.log(`Success rate: ${successRate.toFixed(1)}%`);
+```
+
+</CodeGroup>
+
+---
+
+## Get Metrics History
+
+<api method="GET" endpoint="/api/vms/{vm_id}/metrics" />
+
+Retrieve resource metrics history (last 1000 data points).
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| limit | integer | Number of results (default: 100, max: 1000) |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5001,
+      "vm_id": 123,
+      "timestamp": "2026-05-08T10:30:00Z",
+      "cpu_usage_percent": 45.2,
+      "ram_used_mb": 2048,
+      "ram_total_mb": 4096,
+      "disk_used_gb": 67.5,
+      "disk_total_gb": 100.0,
+      "disk_usage_percent": 67.5,
+      "collection_success": true,
+      "error_message": null
+    }
+  ]
+}
+```
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+# Get last 24 hours of metrics (assuming 5-min intervals = 288 data points)
+curl "http://localhost:8000/api/vms/123/metrics?limit=288" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+response = requests.get(
+    f"http://localhost:8000/api/vms/{vm_id}/metrics",
+    params={"limit": 288},
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+metrics = response.json()['data']
+
+# Plot CPU usage over time
+timestamps = [datetime.fromisoformat(m['timestamp'].replace('Z', '+00:00')) for m in metrics]
+cpu_usage = [m['cpu_usage_percent'] for m in metrics]
+
+plt.plot(timestamps, cpu_usage)
+plt.xlabel('Time')
+plt.ylabel('CPU Usage (%)')
+plt.title('CPU Usage - Last 24 Hours')
+plt.show()
+```
+
+```javascript JavaScript
+const response = await fetch(
+  `http://localhost:8000/api/vms/${vmId}/metrics?limit=288`,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+);
+
+const metrics = await response.json().data;
+
+// Calculate average CPU usage
+const avgCpu = metrics.reduce((sum, m) => sum + m.cpu_usage_percent, 0) / metrics.length;
+console.log(`Average CPU: ${avgCpu.toFixed(1)}%`);
+
+// Find peak CPU usage
+const maxCpu = Math.max(...metrics.map(m => m.cpu_usage_percent));
+console.log(`Peak CPU: ${maxCpu.toFixed(1)}%`);
+```
+
+</CodeGroup>
+
+---
+
+## Error Types
+
+### Ping Error Types
+
+| Error Type | Description | Common Causes |
+|------------|-------------|---------------|
+| ICMP_TIMEOUT | ICMP ping failed | VM powered off, firewall blocks ICMP |
+| TCP_REFUSED | TCP connection refused | SSH service not running, port blocked |
+| HOST_UNREACHABLE | Network routing failed | Network down, IP changed |
+| TIMEOUT | Both ICMP and TCP failed | VM completely unreachable |
+
+### Metrics Error Types
+
+| Error Type | Description | Common Causes |
+|------------|-------------|---------------|
+| SSH_AUTH_FAILED | SSH authentication failed | Wrong credentials, key changed |
+| SSH_TIMEOUT | SSH connection timeout | VM overloaded, network slow |
+| COMMAND_FAILED | Metric command failed | Command not found, permission denied |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Health Monitoring" icon="heart-pulse" href="/features/health-monitoring">
+    Learn about monitoring concepts
+  </Card>
+  
+  <Card title="Alerts API" icon="bell" href="/api-reference/alerts">
+    Configure alerts for monitoring events
+  </Card>
+  
+  <Card title="Dashboard" icon="gauge" href="/guides/dashboard-usage">
+    View metrics in the dashboard
+  </Card>
+  
+  <Card title="VM API" icon="server" href="/api-reference/virtual-machines">
+    Manage VMs
+  </Card>
+</CardGroup>

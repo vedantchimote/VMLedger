@@ -1,0 +1,106 @@
+---
+title: 'Frontend Architecture'
+description: 'Next.js 14 frontend design and implementation'
+icon: 'window'
+---
+
+## Overview
+
+VMLedger's frontend is built with Next.js 14, React, and TailwindCSS for a modern, responsive user interface.
+
+## Technology Stack
+
+<CardGroup cols={3}>
+  <Card title="Next.js 14" icon="react">
+    React framework with App Router
+  </Card>
+  
+  <Card title="TypeScript" icon="code">
+    Type-safe development
+  </Card>
+  
+  <Card title="TailwindCSS" icon="palette">
+    Utility-first CSS
+  </Card>
+  
+  <Card title="React Query" icon="arrows-rotate">
+    Data fetching and caching
+  </Card>
+  
+  <Card title="Axios" icon="globe">
+    HTTP client
+  </Card>
+  
+  <Card title="React Markdown" icon="markdown">
+    Markdown rendering
+  </Card>
+</CardGroup>
+
+## Project Structure
+
+```
+frontend/
+├── app/                   # Next.js App Router
+│   ├── layout.tsx        # Root layout
+│   ├── page.tsx          # Home page
+│   ├── login/            # Login page
+│   ├── register/         # Registration page
+│   ├── dashboard/        # Dashboard page
+│   └── vms/              # VM pages
+│       ├── new/          # Add VM
+│       └── [id]/         # VM details
+├── components/           # React components
+│   ├── VMList.tsx
+│   ├── VMCard.tsx
+│   ├── MetricsChart.tsx
+│   └── SearchBar.tsx
+├── lib/                  # Utilities
+│   ├── api-client.ts    # API client
+│   ├── hooks/           # Custom hooks
+│   └── validation.ts    # Form validation
+└── types/               # TypeScript types
+    └── api.ts
+```
+
+## Key Features
+
+### Auto-Refresh Dashboard
+
+```typescript
+const { data: vms } = useQuery({
+  queryKey: ['vms'],
+  queryFn: fetchVMs,
+  refetchInterval: 30000  // 30 seconds
+});
+```
+
+### Form Validation
+
+```typescript
+const vmSchema = z.object({
+  ip_address: z.string().ip(),
+  hostname: z.string().min(1).max(255),
+  ssh_port: z.number().min(1).max(65535),
+  tags: z.array(z.string()).max(20)
+});
+```
+
+### Markdown Rendering
+
+```typescript
+import ReactMarkdown from 'react-markdown';
+
+<ReactMarkdown>{deploymentNotes}</ReactMarkdown>
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Architecture" icon="server" href="/architecture/backend">
+    FastAPI backend design
+  </Card>
+  
+  <Card title="Development Setup" icon="code" href="/development/setup">
+    Set up development environment
+  </Card>
+</CardGroup>

@@ -1,0 +1,124 @@
+---
+title: 'Database Schema'
+description: 'PostgreSQL database design and schema details'
+icon: 'database'
+---
+
+## Overview
+
+VMLedger uses PostgreSQL 15+ with full-text search extensions for efficient data storage and retrieval.
+
+## Schema Diagram
+
+```mermaid
+erDiagram
+    USERS ||--o{ VMS : owns
+    VMS ||--o| CREDENTIALS : has
+    VMS ||--o{ PING_RESULTS : has
+    VMS ||--o{ METRICS : has
+    VMS ||--o{ ALERTS : has
+    VMS ||--o| ALERT_CONFIGS : has
+    
+    USERS {
+        int id PK
+        string username
+        string email
+        string password_hash
+        string encryption_salt
+        timestamp created_at
+    }
+    
+    VMS {
+        int id PK
+        int user_id FK
+        string ip_address
+        string hostname
+        string domain
+        int ssh_port
+        array tags
+        text deployment_notes
+        tsvector search_vector
+        timestamp last_seen
+        boolean is_reachable
+    }
+    
+    CREDENTIALS {
+        int id PK
+        int vm_id FK
+        string auth_type
+        text encrypted_credential
+        string ssh_username
+    }
+    
+    PING_RESULTS {
+        int id PK
+        int vm_id FK
+        timestamp timestamp
+        boolean success
+        float response_time_ms
+        string error_type
+    }
+    
+    METRICS {
+        int id PK
+        int vm_id FK
+        timestamp timestamp
+        float cpu_usage_percent
+        int ram_used_mb
+        int ram_total_mb
+        float disk_usage_percent
+    }
+```
+
+## Key Tables
+
+### Users
+- Stores user accounts
+- Password hashed with bcrypt
+- Encryption salt for credential encryption
+
+### VMs
+- Core VM registry
+- Full-text search vector for instant search
+- User isolation via user_id foreign key
+
+### Credentials
+- Encrypted SSH credentials (AES-256)
+- Separate table for security
+- One-to-one relationship with VMs
+
+### Ping Results
+- Health check history (last 100 per VM)
+- Response times and error types
+
+### Metrics
+- Resource usage history (last 1000 per VM)
+- CPU, RAM, disk metrics
+
+## Indexes
+
+```sql
+-- Performance indexes
+CREATE INDEX idx_vms_user_id ON vms(user_id);
+CREATE INDEX idx_vms_search ON vms USING GIN(search_vector);
+CREATE INDEX idx_ping_results_vm_timestamp ON ping_results(vm_id, timestamp DESC);
+CREATE INDEX idx_metrics_vm_timestamp ON metrics(vm_id, timestamp DESC);
+```
+
+## Data Retention
+
+- **Ping Results**: Last 100 per VM
+- **Metrics**: Last 1000 per VM
+- **Alerts**: 90 days
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Caching Strategy" icon="gauge-high" href="/architecture/caching">
+    Redis caching implementation
+  </Card>
+  
+  <Card title="Backend Architecture" icon="server" href="/architecture/backend">
+    Backend design
+  </Card>
+</CardGroup>

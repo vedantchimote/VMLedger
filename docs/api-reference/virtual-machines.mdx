@@ -1,0 +1,741 @@
+---
+title: 'Virtual Machines API'
+description: 'Complete CRUD operations for managing virtual machines'
+icon: 'server'
+api: 'GET /api/vms'
+---
+
+## Overview
+
+The Virtual Machines API provides complete CRUD (Create, Read, Update, Delete) operations for managing your VM inventory. All endpoints require authentication.
+
+## List VMs
+
+<api method="GET" endpoint="/api/vms" />
+
+Retrieve all VMs owned by the authenticated user.
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| page | integer | No | Page number (default: 1) |
+| per_page | integer | No | Results per page (default: 50, max: 100) |
+| tags | string | No | Comma-separated tags to filter by |
+| is_reachable | boolean | No | Filter by reachability status |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "ip_address": "192.168.1.100",
+      "hostname": "web-server-01",
+      "domain": "web-server-01.example.com",
+      "ssh_port": 22,
+      "tags": ["production", "web-server", "nginx"],
+      "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24...",
+      "created_at": "2026-05-08T10:30:00Z",
+      "updated_at": "2026-05-08T10:30:00Z",
+      "last_seen": "2026-05-08T10:35:00Z",
+      "is_reachable": true,
+      "latest_cpu": 45.2,
+      "latest_ram_used": 2048,
+      "latest_ram_total": 4096,
+      "latest_disk_percent": 67.5
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 50,
+    "total": 150,
+    "pages": 3
+  },
+  "timestamp": "2026-05-08T10:36:00Z"
+}
+```
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+# Get all VMs
+curl http://localhost:8000/api/vms \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get page 2
+curl "http://localhost:8000/api/vms?page=2&per_page=20" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Filter by tags
+curl "http://localhost:8000/api/vms?tags=production,web-server" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Filter by reachability
+curl "http://localhost:8000/api/vms?is_reachable=true" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+# Get all VMs
+response = requests.get(
+    "http://localhost:8000/api/vms",
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+vms = response.json()['data']
+for vm in vms:
+    status = "🟢" if vm['is_reachable'] else "🔴"
+    print(f"{status} {vm['hostname']} ({vm['ip_address']})")
+
+# Filter by tags
+response = requests.get(
+    "http://localhost:8000/api/vms",
+    params={"tags": "production,web-server"},
+    headers={"Authorization": f"Bearer {token}"}
+)
+```
+
+```javascript JavaScript
+// Get all VMs
+const response = await fetch('http://localhost:8000/api/vms', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+data.data.forEach(vm => {
+  const status = vm.is_reachable ? '🟢' : '🔴';
+  console.log(`${status} ${vm.hostname} (${vm.ip_address})`);
+});
+
+// Filter by tags
+const filtered = await fetch(
+  'http://localhost:8000/api/vms?tags=production,web-server',
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+);
+```
+
+</CodeGroup>
+
+---
+
+## Get VM Details
+
+<api method="GET" endpoint="/api/vms/{vm_id}" />
+
+Retrieve detailed information about a specific VM.
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| vm_id | integer | Yes | VM identifier |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "ip_address": "192.168.1.100",
+    "hostname": "web-server-01",
+    "domain": "web-server-01.example.com",
+    "ssh_port": 22,
+    "tags": ["production", "web-server", "nginx"],
+    "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24.0\n- Node.js 20.11.0\n- PM2 5.3.0",
+    "created_at": "2026-05-08T10:30:00Z",
+    "updated_at": "2026-05-08T10:30:00Z",
+    "last_seen": "2026-05-08T10:35:00Z",
+    "is_reachable": true,
+    "latest_cpu": 45.2,
+    "latest_ram_used": 2048,
+    "latest_ram_total": 4096,
+    "latest_disk_percent": 67.5
+  },
+  "timestamp": "2026-05-08T10:36:00Z"
+}
+```
+
+### Error Responses
+
+<AccordionGroup>
+  <Accordion title="404 Not Found">
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "VM_NOT_FOUND",
+        "message": "VM not found or access denied"
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.get(
+    f"http://localhost:8000/api/vms/{vm_id}",
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+vm = response.json()['data']
+print(f"VM: {vm['hostname']}")
+print(f"Status: {'Online' if vm['is_reachable'] else 'Offline'}")
+print(f"CPU: {vm['latest_cpu']}%")
+```
+
+```javascript JavaScript
+const response = await fetch(`http://localhost:8000/api/vms/${vmId}`, {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+const vm = await response.json().data;
+console.log(`VM: ${vm.hostname}`);
+console.log(`Status: ${vm.is_reachable ? 'Online' : 'Offline'}`);
+```
+
+</CodeGroup>
+
+---
+
+## Create VM
+
+<api method="POST" endpoint="/api/vms" />
+
+Register a new virtual machine.
+
+### Request Body
+
+```json
+{
+  "ip_address": "192.168.1.100",
+  "hostname": "web-server-01",
+  "domain": "web-server-01.example.com",
+  "ssh_port": 22,
+  "ssh_username": "root",
+  "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+  "tags": ["production", "web-server", "nginx"],
+  "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24.0"
+}
+```
+
+### Request Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| ip_address | string | Yes | IPv4 or IPv6 address |
+| hostname | string | Yes | VM hostname (1-255 chars) |
+| domain | string | No | Full domain name |
+| ssh_port | integer | No | SSH port (1-65535, default: 22) |
+| ssh_username | string | No | SSH username (default: root) |
+| ssh_private_key | string | Yes* | SSH private key (RSA, ECDSA, Ed25519) |
+| ssh_password | string | Yes* | SSH password (alternative to key) |
+| tags | array | No | Array of tags (max 20) |
+| deployment_notes | string | No | Markdown notes (max 50,000 chars) |
+
+<Info>
+**Authentication:** Either `ssh_private_key` OR `ssh_password` is required (not both).
+SSH key authentication is recommended for better security.
+</Info>
+
+### Response (201 Created)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "ip_address": "192.168.1.100",
+    "hostname": "web-server-01",
+    "domain": "web-server-01.example.com",
+    "ssh_port": 22,
+    "tags": ["production", "web-server", "nginx"],
+    "deployment_notes": "# Web Server...",
+    "created_at": "2026-05-08T10:30:00Z",
+    "updated_at": "2026-05-08T10:30:00Z",
+    "last_seen": null,
+    "is_reachable": null
+  },
+  "timestamp": "2026-05-08T10:30:00Z"
+}
+```
+
+### Error Responses
+
+<AccordionGroup>
+  <Accordion title="400 Bad Request - Invalid IP">
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Invalid IP address format",
+        "details": {
+          "field": "ip_address",
+          "value": "999.999.999.999"
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="400 Bad Request - Invalid SSH Key">
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "INVALID_SSH_KEY",
+        "message": "Invalid SSH private key format",
+        "details": {
+          "field": "ssh_private_key",
+          "supported_formats": ["RSA", "ECDSA", "Ed25519", "DSA"]
+        }
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="409 Conflict - Duplicate VM">
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "DUPLICATE_VM",
+        "message": "VM with this IP and port already exists",
+        "details": {
+          "ip_address": "192.168.1.100",
+          "ssh_port": 22
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost:8000/api/vms \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ip_address": "192.168.1.100",
+    "hostname": "web-server-01",
+    "ssh_port": 22,
+    "ssh_username": "root",
+    "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+    "tags": ["production", "web-server"]
+  }'
+```
+
+```python Python
+# Read SSH key from file
+with open('/path/to/ssh_key', 'r') as f:
+    ssh_key = f.read()
+
+response = requests.post(
+    "http://localhost:8000/api/vms",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "ip_address": "192.168.1.100",
+        "hostname": "web-server-01",
+        "ssh_port": 22,
+        "ssh_username": "root",
+        "ssh_private_key": ssh_key,
+        "tags": ["production", "web-server"]
+    }
+)
+
+vm = response.json()['data']
+print(f"VM registered with ID: {vm['id']}")
+```
+
+```javascript JavaScript
+// Read SSH key
+const sshKey = await fs.readFile('/path/to/ssh_key', 'utf8');
+
+const response = await fetch('http://localhost:8000/api/vms', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    ip_address: '192.168.1.100',
+    hostname: 'web-server-01',
+    ssh_port: 22,
+    ssh_username: 'root',
+    ssh_private_key: sshKey,
+    tags: ['production', 'web-server']
+  })
+});
+
+const vm = await response.json().data;
+console.log(`VM registered with ID: ${vm.id}`);
+```
+
+</CodeGroup>
+
+---
+
+## Update VM
+
+<api method="PUT" endpoint="/api/vms/{vm_id}" />
+
+Update VM details. Only provided fields will be updated.
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| vm_id | integer | Yes | VM identifier |
+
+### Request Body
+
+```json
+{
+  "hostname": "web-server-01-updated",
+  "tags": ["production", "web-server", "nginx", "ssl"],
+  "deployment_notes": "# Web Server\n\n## Recent Changes\n- Added SSL certificate"
+}
+```
+
+### Request Schema
+
+All fields are optional. Only include fields you want to update.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ip_address | string | IPv4 or IPv6 address |
+| hostname | string | VM hostname |
+| domain | string | Full domain name |
+| ssh_port | integer | SSH port (1-65535) |
+| ssh_username | string | SSH username |
+| ssh_private_key | string | New SSH private key |
+| ssh_password | string | New SSH password |
+| tags | array | Array of tags (replaces existing) |
+| deployment_notes | string | Markdown notes (replaces existing) |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 123,
+    "ip_address": "192.168.1.100",
+    "hostname": "web-server-01-updated",
+    "domain": "web-server-01.example.com",
+    "ssh_port": 22,
+    "tags": ["production", "web-server", "nginx", "ssl"],
+    "deployment_notes": "# Web Server\n\n## Recent Changes\n- Added SSL certificate",
+    "created_at": "2026-05-08T10:30:00Z",
+    "updated_at": "2026-05-08T11:00:00Z",
+    "last_seen": "2026-05-08T10:35:00Z",
+    "is_reachable": true
+  },
+  "timestamp": "2026-05-08T11:00:00Z"
+}
+```
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+# Update hostname and tags
+curl -X PUT http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "hostname": "web-server-01-updated",
+    "tags": ["production", "web-server", "nginx", "ssl"]
+  }'
+
+# Update SSH credentials
+curl -X PUT http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\nNEW_KEY\n-----END OPENSSH PRIVATE KEY-----"
+  }'
+```
+
+```python Python
+# Update deployment notes
+response = requests.put(
+    f"http://localhost:8000/api/vms/{vm_id}",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "deployment_notes": "# Web Server\n\n## Recent Changes\n- Updated to Nginx 1.25"
+    }
+)
+
+# Update multiple fields
+response = requests.put(
+    f"http://localhost:8000/api/vms/{vm_id}",
+    headers={"Authorization": f"Bearer {token}"},
+    json={
+        "hostname": "web-server-01-prod",
+        "tags": ["production", "web-server", "nginx"],
+        "ssh_port": 2222
+    }
+)
+```
+
+```javascript JavaScript
+// Update hostname
+await fetch(`http://localhost:8000/api/vms/${vmId}`, {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    hostname: 'web-server-01-updated'
+  })
+});
+
+// Update tags
+await fetch(`http://localhost:8000/api/vms/${vmId}`, {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    tags: ['production', 'web-server', 'nginx', 'ssl']
+  })
+});
+```
+
+</CodeGroup>
+
+---
+
+## Delete VM
+
+<api method="DELETE" endpoint="/api/vms/{vm_id}" />
+
+Permanently delete a VM and all associated data.
+
+<Warning>
+**This action cannot be undone!** Deleting a VM will permanently remove:
+- VM record
+- SSH credentials
+- Ping history
+- Metrics history
+- Alert history
+- Alert configuration
+- Deployment notes
+</Warning>
+
+### Path Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| vm_id | integer | Yes | VM identifier |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": {
+    "message": "VM deleted successfully",
+    "vm_id": 123
+  },
+  "timestamp": "2026-05-08T11:00:00Z"
+}
+```
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.delete(
+    f"http://localhost:8000/api/vms/{vm_id}",
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+if response.json()['success']:
+    print(f"VM {vm_id} deleted successfully")
+```
+
+```javascript JavaScript
+const response = await fetch(`http://localhost:8000/api/vms/${vmId}`, {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const data = await response.json();
+if (data.success) {
+  console.log(`VM ${vmId} deleted successfully`);
+}
+```
+
+</CodeGroup>
+
+---
+
+## Search VMs
+
+<api method="GET" endpoint="/api/vms/search" />
+
+Search VMs using full-text search across all fields.
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| q | string | Yes | Search query (min 2 characters) |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "ip_address": "192.168.1.100",
+      "hostname": "web-server-01",
+      "tags": ["production", "web-server", "nginx"],
+      "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24...",
+      "rank": 0.95,
+      "highlights": [
+        "...Installed Software\n- <mark>Nginx</mark> 1.24.0...",
+        "...reverse proxy using <mark>Nginx</mark>..."
+      ],
+      "is_reachable": true,
+      "latest_cpu": 45.2
+    }
+  ],
+  "timestamp": "2026-05-08T11:00:00Z"
+}
+```
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+# Search for "nginx"
+curl "http://localhost:8000/api/vms/search?q=nginx" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Search for multiple terms
+curl "http://localhost:8000/api/vms/search?q=production+web-server" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.get(
+    "http://localhost:8000/api/vms/search",
+    params={"q": "nginx"},
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+results = response.json()['data']
+for vm in results:
+    print(f"{vm['hostname']} - Rank: {vm['rank']:.2f}")
+    for highlight in vm['highlights']:
+        print(f"  {highlight}")
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'http://localhost:8000/api/vms/search?q=nginx',
+  {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }
+);
+
+const results = await response.json().data;
+results.forEach(vm => {
+  console.log(`${vm.hostname} - Rank: ${vm.rank.toFixed(2)}`);
+  vm.highlights.forEach(h => console.log(`  ${h}`));
+});
+```
+
+</CodeGroup>
+
+---
+
+## Validation Rules
+
+### IP Address
+- **Format:** Valid IPv4 or IPv6
+- **Examples:** `192.168.1.100`, `2001:db8::1`
+
+### Hostname
+- **Length:** 1-255 characters
+- **Format:** Alphanumeric + hyphens
+- **Examples:** `web-server-01`, `db-prod`
+
+### SSH Port
+- **Range:** 1-65535
+- **Default:** 22
+
+### Tags
+- **Maximum:** 20 tags per VM
+- **Length:** 1-50 characters per tag
+- **Format:** Any string
+
+### Deployment Notes
+- **Maximum:** 50,000 characters
+- **Format:** Markdown
+
+### SSH Private Key
+- **Formats:** RSA, ECDSA, Ed25519, DSA
+- **Requirement:** Unencrypted (no passphrase)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monitoring API" icon="chart-line" href="/api-reference/monitoring">
+    Access health checks and metrics
+  </Card>
+  
+  <Card title="Alerts API" icon="bell" href="/api-reference/alerts">
+    Configure alert notifications
+  </Card>
+  
+  <Card title="VM Management Guide" icon="book" href="/features/vm-management">
+    Learn VM management concepts
+  </Card>
+  
+  <Card title="Search API" icon="magnifying-glass" href="/api-reference/search">
+    Advanced search functionality
+  </Card>
+</CardGroup>

@@ -1,0 +1,95 @@
+---
+title: 'Search API'
+description: 'Full-text search across all VM metadata and deployment notes'
+icon: 'magnifying-glass'
+api: 'GET /api/vms/search'
+---
+
+## Overview
+
+The Search API provides powerful full-text search across IP addresses, hostnames, domains, tags, and deployment notes.
+
+## Search VMs
+
+<api method="GET" endpoint="/api/vms/search" />
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| q | string | Yes | Search query (min 2 characters) |
+
+### Response (200 OK)
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "hostname": "web-server-01",
+      "ip_address": "192.168.1.100",
+      "tags": ["production", "nginx"],
+      "rank": 0.95,
+      "highlights": [
+        "...Installed Software\n- <mark>Nginx</mark> 1.24.0..."
+      ]
+    }
+  ]
+}
+```
+
+### Search Features
+
+- **Partial matching**: "ngin" matches "nginx"
+- **Multi-term search**: "nginx production" (OR logic)
+- **Relevance ranking**: Exact matches rank higher
+- **Highlighting**: Matches wrapped in `<mark>` tags
+- **Fast performance**: < 500ms for 1000 VMs
+
+### Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl "http://localhost:8000/api/vms/search?q=nginx" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+response = requests.get(
+    "http://localhost:8000/api/vms/search",
+    params={"q": "nginx production"},
+    headers={"Authorization": f"Bearer {token}"}
+)
+
+results = response.json()['data']
+for vm in results:
+    print(f"{vm['hostname']} - Rank: {vm['rank']:.2f}")
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'http://localhost:8000/api/vms/search?q=nginx',
+  { headers: { 'Authorization': `Bearer ${token}` } }
+);
+
+const results = await response.json().data;
+results.forEach(vm => {
+  console.log(`${vm.hostname} - Rank: ${vm.rank.toFixed(2)}`);
+});
+```
+
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Search Engine" icon="magnifying-glass" href="/features/search-engine">
+    Learn about search features
+  </Card>
+  
+  <Card title="VM API" icon="server" href="/api-reference/virtual-machines">
+    Manage VMs
+  </Card>
+</CardGroup>

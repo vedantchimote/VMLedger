@@ -1,0 +1,74 @@
+---
+title: 'Caching Strategy'
+description: 'Redis caching implementation for performance optimization'
+icon: 'gauge-high'
+---
+
+## Overview
+
+VMLedger uses Redis for caching, session storage, and as a message broker for Celery.
+
+## Cache Usage
+
+<CardGroup cols={3}>
+  <Card title="Session Tokens" icon="key">
+    JWT tokens with 24-hour TTL
+  </Card>
+  
+  <Card title="Dashboard Data" icon="gauge">
+    VM list cached for 30 seconds
+  </Card>
+  
+  <Card title="Rate Limiting" icon="shield">
+    Request counters per user
+  </Card>
+  
+  <Card title="Celery Queue" icon="list">
+    Task message broker
+  </Card>
+  
+  <Card title="Celery Results" icon="check">
+    Task result backend
+  </Card>
+  
+  <Card title="User Lockouts" icon="lock">
+    Failed login tracking
+  </Card>
+</CardGroup>
+
+## Cache Keys
+
+```
+# Session tokens
+session:{token_id}
+
+# Dashboard cache
+dashboard:{user_id}
+
+# Rate limiting
+ratelimit:{user_id}:{endpoint}
+
+# User lockouts
+lockout:{username}
+```
+
+## TTL Configuration
+
+| Cache Type | TTL | Purpose |
+|------------|-----|---------|
+| Session tokens | 24 hours | Authentication |
+| Dashboard data | 30 seconds | Performance |
+| Rate limit counters | 1 minute | API protection |
+| User lockouts | 30 minutes | Security |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Task Queue" icon="list" href="/architecture/task-queue">
+    Celery background workers
+  </Card>
+  
+  <Card title="Database" icon="database" href="/architecture/database">
+    PostgreSQL schema
+  </Card>
+</CardGroup>

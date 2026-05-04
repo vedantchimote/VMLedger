@@ -1,0 +1,359 @@
+---
+title: 'API Introduction'
+description: 'Getting started with the VMLedger API'
+---
+
+## Base URL
+
+<CodeGroup>
+```bash Development
+http://localhost:8000
+```
+
+```bash Production
+https://api.yourdomain.com
+```
+</CodeGroup>
+
+## Authentication
+
+VMLedger uses JWT (JSON Web Tokens) for authentication. Include the token in the `Authorization` header:
+
+```bash
+Authorization: Bearer <your-jwt-token>
+```
+
+### Getting a Token
+
+<CodeGroup>
+```bash cURL
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "your-username",
+    "password": "your-password"
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "http://localhost:8000/api/auth/login",
+    json={
+        "username": "your-username",
+        "password": "your-password"
+    }
+)
+
+token = response.json()["data"]["token"]
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username: 'your-username',
+    password: 'your-password'
+  })
+});
+
+const { data } = await response.json();
+const token = data.token;
+```
+</CodeGroup>
+
+### Using the Token
+
+<CodeGroup>
+```bash cURL
+curl -X GET http://localhost:8000/api/vms \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+```python Python
+headers = {
+    "Authorization": f"Bearer {token}"
+}
+
+response = requests.get(
+    "http://localhost:8000/api/vms",
+    headers=headers
+)
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8000/api/vms', {
+  headers: {
+    'Authorization': `Bearer ${token}`
+  }
+});
+```
+</CodeGroup>
+
+## Response Format
+
+All API responses follow a consistent format:
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    // Response data here
+  },
+  "request_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+### Error Response
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
+    "details": {
+      // Additional error details
+    }
+  },
+  "request_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Status Codes
+
+| Code | Description |
+|------|-------------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 403 | Forbidden |
+| 404 | Not Found |
+| 422 | Validation Error |
+| 429 | Rate Limit Exceeded |
+| 500 | Internal Server Error |
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| `AUTHENTICATION_ERROR` | Invalid credentials |
+| `TOKEN_EXPIRED` | JWT token has expired |
+| `TOKEN_INVALID` | JWT token is invalid |
+| `VALIDATION_ERROR` | Request validation failed |
+| `RESOURCE_NOT_FOUND` | Requested resource not found |
+| `RATE_LIMIT_EXCEEDED` | Too many requests |
+| `ACCOUNT_LOCKED` | Account is locked |
+| `PERMISSION_DENIED` | Insufficient permissions |
+
+## Pagination
+
+List endpoints support pagination:
+
+```bash
+GET /api/vms?page=1&page_size=20
+```
+
+### Parameters
+
+- `page` (integer): Page number (default: 1)
+- `page_size` (integer): Items per page (default: 20, max: 100)
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [...],
+    "total": 150,
+    "page": 1,
+    "page_size": 20,
+    "total_pages": 8
+  }
+}
+```
+
+## Filtering
+
+Many endpoints support filtering:
+
+```bash
+GET /api/vms?status=active&tags=production,web
+```
+
+## Sorting
+
+Sort results using the `sort` parameter:
+
+```bash
+GET /api/vms?sort=-created_at  # Descending
+GET /api/vms?sort=hostname     # Ascending
+```
+
+## Rate Limiting
+
+API requests are rate-limited:
+
+- **Authentication**: 5 attempts per 15 minutes per username
+- **General API**: 100 requests per minute per user
+
+Rate limit headers:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1640995200
+```
+
+## Interactive API Documentation
+
+VMLedger provides interactive API documentation:
+
+<CardGroup cols={2}>
+  <Card title="Swagger UI" icon="book" href="http://localhost:8000/docs">
+    Interactive API explorer with try-it-out functionality
+  </Card>
+  
+  <Card title="ReDoc" icon="file-lines" href="http://localhost:8000/redoc">
+    Clean, responsive API documentation
+  </Card>
+</CardGroup>
+
+## API Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/api-reference/authentication">
+    User registration, login, and token management
+  </Card>
+  
+  <Card title="Virtual Machines" icon="server" href="/api-reference/virtual-machines">
+    Manage VM inventory and credentials
+  </Card>
+  
+  <Card title="Monitoring" icon="heart-pulse" href="/api-reference/monitoring">
+    Health checks and system metrics
+  </Card>
+  
+  <Card title="Deployments" icon="rocket" href="/api-reference/deployments">
+    Track and manage deployments
+  </Card>
+  
+  <Card title="Alerts" icon="bell" href="/api-reference/alerts">
+    Configure and manage alerts
+  </Card>
+  
+  <Card title="Search" icon="magnifying-glass" href="/api-reference/search">
+    Search across VMs and deployments
+  </Card>
+</CardGroup>
+
+## SDKs and Client Libraries
+
+<Tabs>
+  <Tab title="Python">
+    ```python
+    # Install
+    pip install vmledger-client
+    
+    # Usage
+    from vmledger import VMLedgerClient
+    
+    client = VMLedgerClient(
+        base_url="http://localhost:8000",
+        username="admin",
+        password="password"
+    )
+    
+    # List VMs
+    vms = client.vms.list()
+    
+    # Get VM details
+    vm = client.vms.get(vm_id=1)
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript/TypeScript">
+    ```javascript
+    // Install
+    npm install @vmledger/client
+    
+    // Usage
+    import { VMLedgerClient } from '@vmledger/client';
+    
+    const client = new VMLedgerClient({
+      baseURL: 'http://localhost:8000',
+      username: 'admin',
+      password: 'password'
+    });
+    
+    // List VMs
+    const vms = await client.vms.list();
+    
+    // Get VM details
+    const vm = await client.vms.get(1);
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    ```go
+    // Install
+    go get github.com/yourusername/vmledger-go
+    
+    // Usage
+    import "github.com/yourusername/vmledger-go"
+    
+    client := vmledger.NewClient(
+        "http://localhost:8000",
+        "admin",
+        "password",
+    )
+    
+    // List VMs
+    vms, err := client.VMs.List()
+    
+    // Get VM details
+    vm, err := client.VMs.Get(1)
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  SDKs are planned for future releases. Currently, use the REST API directly.
+</Note>
+
+## Webhooks
+
+VMLedger can send webhook notifications for events:
+
+- VM status changes
+- Alert triggers
+- Deployment completions
+
+See [Alerts](/api-reference/alerts) for webhook configuration.
+
+## API Versioning
+
+The API is currently at version 1.0. Future versions will be accessible via URL:
+
+```
+/api/v1/...  # Current
+/api/v2/...  # Future
+```
+
+## Support
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/yourusername/vmledger/issues">
+    Report bugs or request features
+  </Card>
+  
+  <Card title="Community" icon="slack" href="https://vmledger.slack.com">
+    Join our Slack community
+  </Card>
+</CardGroup>

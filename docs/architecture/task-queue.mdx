@@ -1,0 +1,91 @@
+---
+title: 'Task Queue Architecture'
+description: 'Celery workers and Beat scheduler for background monitoring'
+icon: 'list-check'
+---
+
+## Overview
+
+VMLedger uses Celery with Redis as the message broker for asynchronous background tasks.
+
+## Components
+
+<CardGroup cols={3}>
+  <Card title="Celery Beat" icon="clock">
+    Task scheduler (cron-like)
+  </Card>
+  
+  <Card title="Celery Workers" icon="users">
+    Task executors (10 concurrent)
+  </Card>
+  
+  <Card title="Redis Queue" icon="list">
+    Message broker
+  </Card>
+</CardGroup>
+
+## Task Schedule
+
+```python
+CELERY_BEAT_SCHEDULE = {
+    'ping-all-vms': {
+        'task': 'tasks.schedule_ping_checks',
+        'schedule': 60.0,  # Every 60 seconds
+    },
+    'collect-all-metrics': {
+        'task': 'tasks.schedule_metric_collection',
+        'schedule': 300.0,  # Every 5 minutes
+    },
+    'cleanup-old-data': {
+        'task': 'tasks.cleanup_historical_data',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
+    },
+}
+```
+
+## Task Types
+
+### Ping Check Task
+- Executes ICMP ping + TCP port check
+- Runs every 60 seconds per VM
+- Timeout: 60 seconds
+- Retries: 3 attempts
+
+### Metrics Collection Task
+- SSH-based resource metrics
+- Runs every 5 minutes per VM
+- Timeout: 120 seconds
+- Retries: 3 attempts
+
+### Alert Task
+- Sends webhook/email notifications
+- Triggered by ping failures
+- Timeout: 30 seconds
+- Retries: 3 attempts with exponential backoff
+
+## Concurrency
+
+```
+10 workers × 50 VMs = 5 minutes per monitoring cycle
+20 workers × 100 VMs = 5 minutes per monitoring cycle
+```
+
+## Scaling Workers
+
+```yaml
+# docker-compose.yml
+celery-worker:
+  command: celery -A vmledger.celery_app worker --concurrency=20
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Backend Architecture" icon="server" href="/architecture/backend">
+    FastAPI backend design
+  </Card>
+  
+  <Card title="Monitoring" icon="heart-pulse" href="/features/health-monitoring">
+    Monitoring features
+  </Card>
+</CardGroup>
