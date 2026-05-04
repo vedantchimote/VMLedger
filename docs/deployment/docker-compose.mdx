@@ -1,0 +1,128 @@
+---
+title: 'Docker Compose Deployment'
+description: 'Deploy VMLedger using Docker Compose'
+icon: 'docker'
+---
+
+## Quick Deployment
+
+<Steps>
+  <Step title="Clone Repository">
+    ```bash
+    git clone https://github.com/yourusername/vmledger.git
+    cd vmledger
+    ```
+  </Step>
+  
+  <Step title="Configure Environment">
+    ```bash
+    cp .env.example .env
+    nano .env
+    ```
+    
+    Update these values:
+    ```bash
+    SECRET_KEY=your-random-secret-key
+    ENCRYPTION_KEY=your-random-encryption-key
+    DATABASE_URL=postgresql://vmledger:secure-password@postgres:5432/vmledger
+    ```
+  </Step>
+  
+  <Step title="Start Services">
+    ```bash
+    docker-compose -f docker-compose.prod.yml up -d
+    ```
+  </Step>
+  
+  <Step title="Run Migrations">
+    ```bash
+    docker-compose exec api alembic upgrade head
+    ```
+  </Step>
+  
+  <Step title="Access Application">
+    - Frontend: http://your-server:3000
+    - API: http://your-server:8000
+    - API Docs: http://your-server:8000/docs
+  </Step>
+</Steps>
+
+## Services
+
+```yaml
+services:
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+  
+  celery-worker:
+    build: .
+    command: celery -A vmledger.celery_app worker
+    depends_on:
+      - postgres
+      - redis
+  
+  celery-beat:
+    build: .
+    command: celery -A vmledger.celery_app beat
+    depends_on:
+      - redis
+  
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+```
+
+## Updating
+
+```bash
+# Pull latest changes
+git pull
+
+# Rebuild and restart
+docker-compose -f docker-compose.prod.yml up -d --build
+
+# Run migrations
+docker-compose exec api alembic upgrade head
+```
+
+## Backup
+
+```bash
+# Backup database
+docker-compose exec postgres pg_dump -U vmledger vmledger > backup.sql
+
+# Restore database
+cat backup.sql | docker-compose exec -T postgres psql -U vmledger vmledger
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Production Guide" icon="server" href="/deployment/production">
+    Production best practices
+  </Card>
+  
+  <Card title="Environment Variables" icon="gear" href="/deployment/environment-variables">
+    Configuration reference
+  </Card>
+</CardGroup>

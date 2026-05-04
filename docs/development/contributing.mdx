@@ -1,0 +1,109 @@
+---
+title: 'Contributing Guide'
+description: 'How to contribute to VMLedger development'
+icon: 'code-pull-request'
+---
+
+## Getting Started
+
+<Steps>
+  <Step title="Fork Repository">
+    Fork the VMLedger repository on GitHub
+  </Step>
+  
+  <Step title="Clone Your Fork">
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/vmledger.git
+    cd vmledger
+    ```
+  </Step>
+  
+  <Step title="Create Branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+  
+  <Step title="Make Changes">
+    Follow coding standards and write tests
+  </Step>
+  
+  <Step title="Run Tests">
+    ```bash
+    pytest
+    cd frontend && npm test
+    ```
+  </Step>
+  
+  <Step title="Commit Changes">
+    ```bash
+    git add .
+    git commit -m "Add feature: your feature description"
+    ```
+  </Step>
+  
+  <Step title="Push to Fork">
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+  </Step>
+  
+  <Step title="Create Pull Request">
+    Open a pull request on GitHub
+  </Step>
+</Steps>
+
+## Coding Standards
+
+### Python (Backend)
+- Follow PEP 8
+- Use type hints
+- Write docstrings
+- Maximum line length: 100 characters
+
+### TypeScript (Frontend)
+- Follow ESLint rules
+- Use TypeScript types
+- Write JSDoc comments
+- Use functional components
+
+## Commit Messages
+
+Format: `type: description`
+
+Types:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation
+- `test`: Tests
+- `refactor`: Code refactoring
+- `style`: Code style changes
+- `chore`: Maintenance
+
+Examples:
+```
+feat: add VM bulk delete functionality
+fix: resolve SSH connection timeout issue
+docs: update API documentation for alerts
+test: add unit tests for credential manager
+```
+
+## Pull Request Guidelines
+
+- Provide clear description
+- Reference related issues
+- Include tests
+- Update documentation
+- Ensure CI passes
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Development Setup" icon="code" href="/development/setup">
+    Set up development environment
+  </Card>
+  
+  <Card title="Testing" icon="flask" href="/development/testing">
+    Run tests
+  </Card>
+</CardGroup>

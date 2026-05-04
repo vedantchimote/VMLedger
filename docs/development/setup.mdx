@@ -1,0 +1,132 @@
+---
+title: 'Development Setup'
+description: 'Set up local development environment for VMLedger'
+icon: 'code'
+---
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Python 3.11+" icon="python">
+    Backend runtime
+  </Card>
+  
+  <Card title="Node.js 20+" icon="node-js">
+    Frontend runtime
+  </Card>
+  
+  <Card title="Docker" icon="docker">
+    For PostgreSQL and Redis
+  </Card>
+  
+  <Card title="Git" icon="git">
+    Version control
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Clone Repository">
+    ```bash
+    git clone https://github.com/yourusername/vmledger.git
+    cd vmledger
+    ```
+  </Step>
+  
+  <Step title="Start Services">
+    ```bash
+    # Start PostgreSQL and Redis
+    docker-compose up -d postgres redis
+    ```
+  </Step>
+  
+  <Step title="Setup Backend">
+    ```bash
+    # Create virtual environment
+    python -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    
+    # Install dependencies
+    pip install -r requirements.txt
+    
+    # Run migrations
+    alembic upgrade head
+    
+    # Start API
+    uvicorn vmledger.main:app --reload
+    ```
+  </Step>
+  
+  <Step title="Setup Frontend">
+    ```bash
+    cd frontend
+    npm install
+    npm run dev
+    ```
+  </Step>
+  
+  <Step title="Start Workers">
+    ```bash
+    # Terminal 1: Celery worker
+    celery -A vmledger.celery_app worker --loglevel=info
+    
+    # Terminal 2: Celery beat
+    celery -A vmledger.celery_app beat --loglevel=info
+    ```
+  </Step>
+</Steps>
+
+## Access Points
+
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
+
+## Environment Variables
+
+Create `.env` file:
+
+```bash
+# Database
+DATABASE_URL=postgresql://vmledger:password@localhost:5432/vmledger
+
+# Redis
+REDIS_URL=redis://localhost:6379/0
+
+# Security
+SECRET_KEY=your-secret-key-here
+ENCRYPTION_KEY=your-encryption-key-here
+
+# Monitoring
+PING_INTERVAL=60
+METRICS_INTERVAL=300
+
+# SMTP (optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Docker Development" icon="docker" href="/development/docker">
+    Use Docker for development
+  </Card>
+  
+  <Card title="Testing" icon="flask" href="/development/testing">
+    Run tests
+  </Card>
+  
+  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+    Contribution guidelines
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/development/troubleshooting">
+    Common issues
+  </Card>
+</CardGroup>

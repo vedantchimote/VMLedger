@@ -1,0 +1,85 @@
+---
+title: 'Managing Deployments'
+description: 'Document and track software deployments on your VMs'
+icon: 'rocket'
+---
+
+## Overview
+
+Use deployment notes to maintain living documentation of what's installed on each VM.
+
+## Creating Deployment Notes
+
+### Basic Template
+
+```markdown
+# VM Name
+
+## Installed Software
+- Software 1 (version)
+- Software 2 (version)
+
+## Configuration
+- Config file locations
+- Environment variables
+
+## Deployment History
+### YYYY-MM-DD
+- Changes made
+- Deployed by: name@example.com
+```
+
+### Add Notes via API
+
+```bash
+curl -X PUT http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24.0\n- Node.js 20.11.0"
+  }'
+```
+
+## Searching Deployment Notes
+
+```bash
+# Find all VMs with Nginx
+curl "http://localhost:8000/api/vms/search?q=nginx" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Find specific version
+curl "http://localhost:8000/api/vms/search?q=nginx+1.24" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Update Immediately" icon="clock">
+    Document changes right after deployment
+  </Card>
+  
+  <Card title="Include Versions" icon="tag">
+    Always specify software versions
+  </Card>
+  
+  <Card title="Track Changes" icon="timeline">
+    Maintain deployment history section
+  </Card>
+  
+  <Card title="Add Rollback Steps" icon="rotate-left">
+    Document how to undo deployments
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Deployment Tracking" icon="rocket" href="/features/deployment-tracking">
+    Learn about deployment features
+  </Card>
+  
+  <Card title="Search Engine" icon="magnifying-glass" href="/features/search-engine">
+    Search deployment notes
+  </Card>
+</CardGroup>

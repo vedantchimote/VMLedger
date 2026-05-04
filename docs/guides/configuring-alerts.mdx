@@ -1,0 +1,112 @@
+---
+title: 'Configuring Alerts'
+description: 'Set up webhook and email notifications for VM failures'
+icon: 'bell-on'
+---
+
+## Overview
+
+Configure VMLedger to send notifications when VMs become unreachable or recover.
+
+## Quick Start
+
+### Enable Alerts for a VM
+
+```bash
+curl -X PUT http://localhost:8000/api/vms/123/alerts/config \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": true,
+    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+    "email_recipient": "admin@example.com",
+    "cooldown_minutes": 15
+  }'
+```
+
+## Slack Integration
+
+<Steps>
+  <Step title="Create Slack Webhook">
+    1. Go to https://api.slack.com/apps
+    2. Create new app → "From scratch"
+    3. Enable "Incoming Webhooks"
+    4. Add webhook to workspace
+    5. Copy webhook URL
+  </Step>
+  
+  <Step title="Configure VMLedger">
+    ```bash
+    curl -X PUT http://localhost:8000/api/vms/123/alerts/config \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -d '{
+        "enabled": true,
+        "webhook_url": "https://hooks.slack.com/services/T00/B00/XXX"
+      }'
+    ```
+  </Step>
+  
+  <Step title="Test Alert">
+    Temporarily shut down the VM to trigger an alert
+  </Step>
+</Steps>
+
+## Email Notifications
+
+### Configure SMTP
+
+Edit `.env` file:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM=vmledger@example.com
+SMTP_USE_TLS=true
+```
+
+### Enable Email Alerts
+
+```bash
+curl -X PUT http://localhost:8000/api/vms/123/alerts/config \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "enabled": true,
+    "email_recipient": "admin@example.com"
+  }'
+```
+
+## Bulk Configuration
+
+Configure alerts for multiple VMs:
+
+```bash
+# Get all production VMs
+VM_IDS=$(curl -s http://localhost:8000/api/vms \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  | jq -r '.data[] | select(.tags[] == "production") | .id')
+
+# Configure alerts for each
+for vm_id in $VM_IDS; do
+  curl -X PUT "http://localhost:8000/api/vms/$vm_id/alerts/config" \
+    -H "Authorization: Bearer YOUR_TOKEN" \
+    -d '{
+      "enabled": true,
+      "webhook_url": "https://hooks.slack.com/services/T00/B00/XXX",
+      "cooldown_minutes": 15
+    }'
+done
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Alerting System" icon="bell" href="/features/alerting">
+    Learn about alert features
+  </Card>
+  
+  <Card title="Alerts API" icon="code" href="/api-reference/alerts">
+    Complete API reference
+  </Card>
+</CardGroup>

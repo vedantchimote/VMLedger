@@ -1,0 +1,107 @@
+---
+title: 'Testing Guide'
+description: 'Run unit, integration, and end-to-end tests'
+icon: 'flask'
+---
+
+## Overview
+
+VMLedger uses pytest for backend tests and Jest for frontend tests.
+
+## Backend Tests
+
+### Run All Tests
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=vmledger --cov-report=html
+
+# Run specific test file
+pytest tests/unit/test_auth_service.py
+
+# Run specific test
+pytest tests/unit/test_auth_service.py::test_register_user
+```
+
+### Test Types
+
+<CardGroup cols={3}>
+  <Card title="Unit Tests" icon="cube">
+    Test individual functions
+    
+    `tests/unit/`
+  </Card>
+  
+  <Card title="Integration Tests" icon="link">
+    Test service interactions
+    
+    `tests/integration/`
+  </Card>
+  
+  <Card title="API Tests" icon="globe">
+    Test API endpoints
+    
+    `tests/api/`
+  </Card>
+</CardGroup>
+
+### Example Test
+
+```python
+def test_register_user():
+    user = auth_service.register_user(
+        username="testuser",
+        email="test@example.com",
+        password="SecureP@ssw0rd123!"
+    )
+    
+    assert user.username == "testuser"
+    assert user.email == "test@example.com"
+    assert user.password_hash != "SecureP@ssw0rd123!"
+```
+
+## Frontend Tests
+
+### Run All Tests
+
+```bash
+cd frontend
+
+# Run all tests
+npm test
+
+# Run with coverage
+npm test -- --coverage
+
+# Run in watch mode
+npm test -- --watch
+```
+
+### Example Test
+
+```typescript
+describe('VMList', () => {
+  it('renders VM list', () => {
+    render(<VMList vms={mockVMs} />);
+    expect(screen.getByText('web-server-01')).toBeInTheDocument();
+  });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+    Contribution guidelines
+  </Card>
+  
+  <Card title="Development Setup" icon="code" href="/development/setup">
+    Set up development environment
+  </Card>
+</CardGroup>

@@ -1,0 +1,275 @@
+---
+title: 'Adding VMs'
+description: 'Step-by-step guide to registering your first virtual machine'
+icon: 'plus'
+---
+
+## Overview
+
+This guide walks you through registering your first VM in VMLedger, from gathering information to verifying monitoring is working.
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="VMLedger Account" icon="user">
+    You need a registered account and authentication token
+  </Card>
+  
+  <Card title="VM Access" icon="key">
+    SSH access to the VM you want to register
+  </Card>
+  
+  <Card title="Network Access" icon="network-wired">
+    VMLedger server must be able to reach the VM
+  </Card>
+  
+  <Card title="SSH Credentials" icon="file-key">
+    SSH private key or password for the VM
+  </Card>
+</CardGroup>
+
+## Step 1: Gather VM Information
+
+Collect these details about your VM:
+
+<Steps>
+  <Step title="IP Address">
+    ```bash
+    # On the VM, run:
+    ip addr show | grep "inet "
+    # Or:
+    hostname -I
+    ```
+    
+    Example: `192.168.1.100`
+  </Step>
+  
+  <Step title="Hostname">
+    ```bash
+    # On the VM, run:
+    hostname
+    ```
+    
+    Example: `web-server-01`
+  </Step>
+  
+  <Step title="SSH Port">
+    ```bash
+    # Check SSH configuration:
+    grep "^Port" /etc/ssh/sshd_config
+    ```
+    
+    Default: `22`
+  </Step>
+  
+  <Step title="SSH Credentials">
+    **Option A: SSH Key (Recommended)**
+    ```bash
+    # Generate new key if needed:
+    ssh-keygen -t ed25519 -f ~/.ssh/vmledger_key -N ""
+    
+    # Copy to VM:
+    ssh-copy-id -i ~/.ssh/vmledger_key.pub root@192.168.1.100
+    ```
+    
+    **Option B: Password**
+    Use the root or admin password for the VM
+  </Step>
+</Steps>
+
+## Step 2: Test SSH Connection
+
+Before registering, verify SSH access works:
+
+```bash
+# Test with key:
+ssh -i ~/.ssh/vmledger_key root@192.168.1.100
+
+# Test with password:
+ssh root@192.168.1.100
+
+# Once connected, test commands VMLedger will use:
+top -bn1 | grep "Cpu(s)"
+free -m
+df -h /
+```
+
+## Step 3: Register the VM
+
+<Tabs>
+  <Tab title="Web Dashboard">
+    1. Log in to VMLedger dashboard
+    2. Click "Add VM" button
+    3. Fill in the form:
+       - IP Address: `192.168.1.100`
+       - Hostname: `web-server-01`
+       - SSH Port: `22`
+       - SSH Username: `root`
+       - SSH Key: Paste your private key
+       - Tags: `production`, `web-server`
+    4. Click "Register VM"
+  </Tab>
+  
+  <Tab title="API (cURL)">
+    ```bash
+    # Read SSH key
+    SSH_KEY=$(cat ~/.ssh/vmledger_key)
+    
+    # Register VM
+    curl -X POST http://localhost:8000/api/vms \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"ip_address\": \"192.168.1.100\",
+        \"hostname\": \"web-server-01\",
+        \"ssh_port\": 22,
+        \"ssh_username\": \"root\",
+        \"ssh_private_key\": \"$SSH_KEY\",
+        \"tags\": [\"production\", \"web-server\"]
+      }"
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    ```python
+    import requests
+    
+    # Read SSH key
+    with open('/home/user/.ssh/vmledger_key', 'r') as f:
+        ssh_key = f.read()
+    
+    # Register VM
+    response = requests.post(
+        "http://localhost:8000/api/vms",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "ip_address": "192.168.1.100",
+            "hostname": "web-server-01",
+            "ssh_port": 22,
+            "ssh_username": "root",
+            "ssh_private_key": ssh_key,
+            "tags": ["production", "web-server"]
+        }
+    )
+    
+    vm = response.json()['data']
+    print(f"VM registered with ID: {vm['id']}")
+    ```
+  </Tab>
+</Tabs>
+
+## Step 4: Verify Registration
+
+<Steps>
+  <Step title="Check VM appears in list">
+    ```bash
+    curl http://localhost:8000/api/vms \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      | jq '.data[] | {id, hostname, ip_address}'
+    ```
+  </Step>
+  
+  <Step title="Wait for first health check (60 seconds)">
+    VMLedger automatically starts monitoring after registration.
+    
+    ```bash
+    # Check status after 60 seconds:
+    curl http://localhost:8000/api/vms/123/status \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      | jq '.data.is_reachable'
+    ```
+    
+    Should return: `true`
+  </Step>
+  
+  <Step title="Wait for first metrics (5 minutes)">
+    ```bash
+    # Check metrics after 5 minutes:
+    curl http://localhost:8000/api/vms/123/metrics \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      | jq '.data[0] | {cpu_usage_percent, ram_used_mb, disk_usage_percent}'
+    ```
+  </Step>
+</Steps>
+
+## Step 5: Add Deployment Notes
+
+Document what's installed on the VM:
+
+```bash
+curl -X PUT http://localhost:8000/api/vms/123 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24.0\n- Node.js 20.11.0\n- PM2 5.3.0\n\n## Configuration\n- Nginx config: /etc/nginx/sites-available/myapp\n- SSL certificate: /etc/letsencrypt/live/example.com"
+  }'
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="VM Not Reachable After Registration">
+    **Check:**
+    1. Firewall allows ICMP and SSH port
+    2. VM is powered on
+    3. IP address is correct
+    4. SSH service is running
+    
+    ```bash
+    # Test manually:
+    ping 192.168.1.100
+    nc -zv 192.168.1.100 22
+    ssh root@192.168.1.100
+    ```
+  </Accordion>
+  
+  <Accordion title="Metrics Not Collecting">
+    **Check:**
+    1. SSH credentials are correct
+    2. SSH user has permission to run commands
+    3. Required commands exist (top, free, df)
+    
+    ```bash
+    # Test commands:
+    ssh root@192.168.1.100 "top -bn1 | grep 'Cpu(s)'"
+    ssh root@192.168.1.100 "free -m"
+    ssh root@192.168.1.100 "df -h /"
+    ```
+  </Accordion>
+  
+  <Accordion title="Invalid SSH Key Error">
+    **Solutions:**
+    1. Ensure key is unencrypted (no passphrase)
+    2. Use supported format (RSA, ECDSA, Ed25519)
+    3. Include full key with headers
+    
+    ```bash
+    # Generate unencrypted key:
+    ssh-keygen -t ed25519 -f ~/.ssh/vmledger_key -N ""
+    
+    # Verify format:
+    head -1 ~/.ssh/vmledger_key
+    # Should show: -----BEGIN OPENSSH PRIVATE KEY-----
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Alerts" icon="bell" href="/guides/configuring-alerts">
+    Set up notifications for this VM
+  </Card>
+  
+  <Card title="View Monitoring" icon="chart-line" href="/guides/setting-up-monitoring">
+    Learn about monitoring features
+  </Card>
+  
+  <Card title="Add More VMs" icon="plus" href="/features/vm-management">
+    Register additional VMs
+  </Card>
+  
+  <Card title="Search VMs" icon="magnifying-glass" href="/features/search-engine">
+    Find VMs quickly
+  </Card>
+</CardGroup>

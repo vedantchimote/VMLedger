@@ -1,0 +1,119 @@
+---
+title: 'Setting Up Monitoring'
+description: 'Configure health checks and metrics collection for your VMs'
+icon: 'heart-pulse'
+---
+
+## Overview
+
+VMLedger automatically starts monitoring VMs after registration. This guide explains how monitoring works and how to customize it.
+
+## Monitoring Components
+
+<CardGroup cols={2}>
+  <Card title="Health Checks" icon="heartbeat">
+    ICMP ping + TCP port check every 60 seconds
+  </Card>
+  
+  <Card title="Metrics Collection" icon="chart-line">
+    CPU, RAM, disk usage via SSH every 5 minutes
+  </Card>
+</CardGroup>
+
+## Default Configuration
+
+Monitoring starts automatically with these defaults:
+
+```bash
+# In .env file
+PING_INTERVAL=60          # Health checks every 60 seconds
+METRICS_INTERVAL=300      # Metrics every 5 minutes (300 seconds)
+CONCURRENT_WORKERS=10     # 10 VMs monitored simultaneously
+```
+
+## Customizing Intervals
+
+### For All VMs
+
+Edit `.env` file and restart services:
+
+```bash
+# Edit configuration
+nano .env
+
+# Update values:
+PING_INTERVAL=30          # More frequent health checks
+METRICS_INTERVAL=180      # More frequent metrics
+
+# Restart services
+docker-compose restart celery-worker celery-beat
+```
+
+### Recommendations by VM Count
+
+| VM Count | Ping Interval | Metrics Interval | Workers |
+|----------|---------------|------------------|---------|
+| 1-10 | 30s | 180s (3 min) | 5 |
+| 11-50 | 60s | 300s (5 min) | 10 |
+| 51-100 | 120s | 600s (10 min) | 20 |
+| 100+ | 180s | 900s (15 min) | 40 |
+
+## Viewing Monitoring Data
+
+### Dashboard
+
+Access the web dashboard at `http://localhost:3000` to see:
+- Real-time VM status (green/red indicators)
+- Latest CPU, RAM, disk metrics
+- Last seen timestamps
+- Auto-refresh every 30 seconds
+
+### API
+
+```bash
+# Get current status
+curl http://localhost:8000/api/vms/123/status \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get ping history
+curl http://localhost:8000/api/vms/123/ping \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Get metrics history
+curl http://localhost:8000/api/vms/123/metrics \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Monitoring Not Starting">
+    **Check Celery services:**
+    ```bash
+    docker ps | grep celery
+    docker logs vmledger-celery-beat
+    docker logs vmledger-celery-worker
+    ```
+  </Accordion>
+  
+  <Accordion title="Slow Monitoring Cycles">
+    **Increase workers:**
+    ```yaml
+    # docker-compose.yml
+    celery-worker:
+      command: celery -A vmledger.celery_app worker --concurrency=20
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Alerts" icon="bell" href="/guides/configuring-alerts">
+    Get notified when VMs go down
+  </Card>
+  
+  <Card title="Health Monitoring" icon="heart-pulse" href="/features/health-monitoring">
+    Learn monitoring concepts
+  </Card>
+</CardGroup>

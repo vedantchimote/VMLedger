@@ -1,0 +1,140 @@
+---
+title: 'Development Troubleshooting'
+description: 'Common development issues and solutions'
+icon: 'wrench'
+---
+
+## Common Issues
+
+<AccordionGroup>
+  <Accordion title="Database Connection Error">
+    **Error:** `could not connect to server: Connection refused`
+    
+    **Solutions:**
+    ```bash
+    # Check PostgreSQL is running
+    docker ps | grep postgres
+    
+    # Start PostgreSQL
+    docker-compose up -d postgres
+    
+    # Check connection
+    psql -h localhost -U vmledger -d vmledger
+    ```
+  </Accordion>
+  
+  <Accordion title="Redis Connection Error">
+    **Error:** `Error connecting to Redis`
+    
+    **Solutions:**
+    ```bash
+    # Check Redis is running
+    docker ps | grep redis
+    
+    # Start Redis
+    docker-compose up -d redis
+    
+    # Test connection
+    redis-cli ping
+    ```
+  </Accordion>
+  
+  <Accordion title="Migration Errors">
+    **Error:** `Target database is not up to date`
+    
+    **Solutions:**
+    ```bash
+    # Run migrations
+    alembic upgrade head
+    
+    # Reset database (WARNING: deletes all data)
+    alembic downgrade base
+    alembic upgrade head
+    ```
+  </Accordion>
+  
+  <Accordion title="Import Errors">
+    **Error:** `ModuleNotFoundError: No module named 'vmledger'`
+    
+    **Solutions:**
+    ```bash
+    # Activate virtual environment
+    source venv/bin/activate
+    
+    # Reinstall dependencies
+    pip install -r requirements.txt
+    
+    # Add to PYTHONPATH
+    export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+    ```
+  </Accordion>
+  
+  <Accordion title="Frontend Build Errors">
+    **Error:** `Module not found` or `Cannot find module`
+    
+    **Solutions:**
+    ```bash
+    cd frontend
+    
+    # Clear cache
+    rm -rf .next node_modules
+    
+    # Reinstall
+    npm install
+    
+    # Rebuild
+    npm run build
+    ```
+  </Accordion>
+  
+  <Accordion title="Celery Not Starting">
+    **Error:** `Celery worker not processing tasks`
+    
+    **Solutions:**
+    ```bash
+    # Check Redis connection
+    redis-cli ping
+    
+    # Start worker with debug logging
+    celery -A vmledger.celery_app worker --loglevel=debug
+    
+    # Check Beat scheduler
+    celery -A vmledger.celery_app beat --loglevel=debug
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debug Mode
+
+### Enable Debug Logging
+
+```python
+# In .env
+DEBUG=true
+LOG_LEVEL=DEBUG
+```
+
+### View Logs
+
+```bash
+# API logs
+tail -f logs/vmledger.log
+
+# Docker logs
+docker-compose logs -f api
+
+# Celery logs
+docker-compose logs -f celery-worker
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Development Setup" icon="code" href="/development/setup">
+    Set up development environment
+  </Card>
+  
+  <Card title="Docker Development" icon="docker" href="/development/docker">
+    Use Docker for development
+  </Card>
+</CardGroup>

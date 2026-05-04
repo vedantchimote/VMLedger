@@ -1,0 +1,98 @@
+---
+title: 'Docker Development'
+description: 'Use Docker Compose for local development'
+icon: 'docker'
+---
+
+## Overview
+
+Run the entire VMLedger stack with Docker Compose for simplified development.
+
+## Quick Start
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+```
+
+## Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| API | 8000 | FastAPI backend |
+| Frontend | 3000 | Next.js frontend |
+| PostgreSQL | 5432 | Database |
+| Redis | 6379 | Cache & queue |
+| Celery Worker | - | Background tasks |
+| Celery Beat | - | Task scheduler |
+
+## Common Commands
+
+```bash
+# Rebuild after code changes
+docker-compose up -d --build
+
+# View specific service logs
+docker-compose logs -f api
+
+# Run migrations
+docker-compose exec api alembic upgrade head
+
+# Access database
+docker-compose exec postgres psql -U vmledger
+
+# Access Redis CLI
+docker-compose exec redis redis-cli
+
+# Restart service
+docker-compose restart api
+
+# Stop and remove volumes
+docker-compose down -v
+```
+
+## Development Workflow
+
+<Steps>
+  <Step title="Make Code Changes">
+    Edit files in your editor
+  </Step>
+  
+  <Step title="Rebuild if Needed">
+    ```bash
+    # For dependency changes
+    docker-compose up -d --build api
+    
+    # For code changes (auto-reload enabled)
+    # No rebuild needed
+    ```
+  </Step>
+  
+  <Step title="View Logs">
+    ```bash
+    docker-compose logs -f api
+    ```
+  </Step>
+  
+  <Step title="Test Changes">
+    Access http://localhost:3000
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Local Setup" icon="code" href="/development/setup">
+    Non-Docker development
+  </Card>
+  
+  <Card title="Testing" icon="flask" href="/development/testing">
+    Run tests
+  </Card>
+</CardGroup>
