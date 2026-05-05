@@ -1,0 +1,13 @@
+<svg width="120" height="32" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- VM Icon -->
+  <rect x="2" y="6" width="20" height="20" rx="3" fill="#07C983" opacity="0.2"/>
+  <rect x="4" y="8" width="16" height="16" rx="2" stroke="#07C983" stroke-width="2" fill="none"/>
+  <line x1="7" y1="12" x2="17" y2="12" stroke="#07C983" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="7" y1="16" x2="14" y2="16" stroke="#07C983" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="7" y1="20" x2="15" y2="20" stroke="#07C983" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <!-- Text: VMLedger -->
+  <text x="28" y="22" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#ffffff">
+    VM<tspan fill="#07C983">Ledger</tspan>
+  </text>
+</svg>
