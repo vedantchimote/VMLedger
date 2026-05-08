@@ -76,6 +76,10 @@ celery_app.conf.beat_schedule = {
         "task": "vmledger.tasks.cleanup_historical_data",
         "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM UTC
     },
+    "dns-resolve-all-vms": {
+        "task": "vmledger.tasks.schedule_dns_resolution",
+        "schedule": crontab(hour="*/6", minute=15),  # Every 6 hours at :15
+    },
 }
 
 

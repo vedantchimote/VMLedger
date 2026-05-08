@@ -7,11 +7,14 @@ This module implements all background tasks for VM monitoring:
 - schedule_ping_checks: Orchestrator task to dispatch ping checks for all VMs
 - schedule_metric_collection: Orchestrator task to dispatch metric collection for all VMs
 - cleanup_historical_data: Daily cleanup task for data retention policies
+- dns_resolve_task: Resolve hostname to IP and detect drift
+- schedule_dns_resolution: Orchestrator task to dispatch DNS resolution for all VMs
 
 Requirements: 4.1, 5.6, 8.1, 9.1-9.5, 15.1-15.6
 """
 
 import logging
+import socket
 from datetime import datetime
 from typing import List
 
@@ -346,6 +349,158 @@ def cleanup_historical_data():
         elapsed = (datetime.utcnow() - start_time).total_seconds()
         logger.error(
             f"cleanup_historical_data task failed after {elapsed:.2f}s: {exc}"
+        )
+        return {
+            'success': False,
+            'error': str(exc),
+            'elapsed_seconds': elapsed
+        }
+
+
+@celery_app.task(bind=True, max_retries=2)
+def dns_resolve_task(self, vm_id: int):
+    """
+    Resolve hostname to IP address for a single VM and detect drift.
+    
+    This task:
+    1. Retrieves VM from database
+    2. Resolves hostname via DNS (socket.getaddrinfo)
+    3. Compares resolved IP with stored ip_address
+    4. Updates resolved_ip, dns_last_checked, and dns_mismatch fields
+    
+    Args:
+        vm_id: VM ID to resolve
+    """
+    start_time = datetime.utcnow()
+    logger.info(f"Starting DNS resolution task for VM {vm_id}")
+    
+    try:
+        with get_db_context() as db:
+            vm = db.query(VM).filter(VM.id == vm_id).first()
+            
+            if not vm:
+                logger.error(f"VM {vm_id} not found")
+                return {
+                    'success': False,
+                    'vm_id': vm_id,
+                    'error': 'VM not found'
+                }
+            
+            hostname = vm.hostname
+            stored_ip = vm.ip_address
+            resolved_ip = None
+            dns_mismatch = False
+            error_msg = None
+            
+            try:
+                # Resolve hostname to IP address
+                # getaddrinfo returns list of (family, type, proto, canonname, sockaddr)
+                results = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                if results:
+                    # Take the first result's IP address
+                    resolved_ip = results[0][4][0]
+                    dns_mismatch = (resolved_ip != stored_ip)
+                    
+                    if dns_mismatch:
+                        logger.warning(
+                            f"DNS mismatch for VM {vm_id} ({hostname}): "
+                            f"stored={stored_ip}, resolved={resolved_ip}"
+                        )
+                    else:
+                        logger.info(
+                            f"DNS resolved for VM {vm_id} ({hostname}): "
+                            f"IP matches ({resolved_ip})"
+                        )
+                else:
+                    error_msg = f"No DNS results for hostname: {hostname}"
+                    logger.warning(error_msg)
+                    
+            except socket.gaierror as e:
+                error_msg = f"DNS resolution failed for {hostname}: {e}"
+                logger.warning(error_msg)
+            except Exception as e:
+                error_msg = f"Unexpected error resolving {hostname}: {e}"
+                logger.error(error_msg)
+            
+            # Update VM record
+            vm.dns_last_checked = datetime.utcnow()
+            if resolved_ip:
+                vm.resolved_ip = resolved_ip
+                vm.dns_mismatch = dns_mismatch
+            
+            db.commit()
+            
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(
+                f"Completed DNS resolution task for VM {vm_id} in {elapsed:.2f}s"
+            )
+            
+            return {
+                'success': True,
+                'vm_id': vm_id,
+                'hostname': hostname,
+                'stored_ip': stored_ip,
+                'resolved_ip': resolved_ip,
+                'dns_mismatch': dns_mismatch,
+                'error': error_msg,
+                'elapsed_seconds': elapsed
+            }
+            
+    except Exception as exc:
+        elapsed = (datetime.utcnow() - start_time).total_seconds()
+        logger.error(
+            f"DNS resolution task failed for VM {vm_id} after {elapsed:.2f}s: {exc}"
+        )
+        raise self.retry(exc=exc, countdown=120)
+
+
+@celery_app.task
+def schedule_dns_resolution():
+    """
+    Orchestrator task to schedule DNS resolution for all VMs.
+    
+    Runs every 6 hours. For each VM, resolves the hostname and
+    compares the result against the stored IP address to detect drift.
+    """
+    start_time = datetime.utcnow()
+    logger.info("Starting schedule_dns_resolution orchestrator task")
+    
+    try:
+        with get_db_context() as db:
+            vms = db.query(VM).all()
+            vm_count = len(vms)
+            
+            if vm_count == 0:
+                logger.info("No VMs found for DNS resolution")
+                return {
+                    'success': True,
+                    'vms_scheduled': 0,
+                    'elapsed_seconds': 0
+                }
+            
+            logger.info(f"Scheduling DNS resolution for {vm_count} VMs")
+            
+            job = group(
+                dns_resolve_task.s(vm.id) for vm in vms
+            )
+            
+            result = job.apply_async()
+            
+            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(
+                f"Scheduled DNS resolution for {vm_count} VMs in {elapsed:.2f}s"
+            )
+            
+            return {
+                'success': True,
+                'vms_scheduled': vm_count,
+                'elapsed_seconds': elapsed
+            }
+            
+    except Exception as exc:
+        elapsed = (datetime.utcnow() - start_time).total_seconds()
+        logger.error(
+            f"schedule_dns_resolution failed after {elapsed:.2f}s: {exc}"
         )
         return {
             'success': False,

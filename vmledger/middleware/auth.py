@@ -67,6 +67,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             HTTP response
         """
+        # Allow CORS preflight (OPTIONS) requests to pass through
+        # These are handled by the CORSMiddleware and carry no credentials
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Check if path is public (no authentication required)
         if self._is_public_path(request.url.path):
             return await call_next(request)

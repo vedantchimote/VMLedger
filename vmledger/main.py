@@ -191,6 +191,23 @@ from vmledger.api import auth, vms
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(vms.router, prefix="/api/vms", tags=["VMs"])
 
+# Standalone routes for endpoints that conflict with /{vm_id} in the VMs router
+# These must be registered at /api/* to avoid the path parameter conflict
+app.add_api_route(
+    "/api/dashboard",
+    vms.get_dashboard,
+    methods=["GET"],
+    tags=["VMs"],
+    summary="Get dashboard data",
+)
+app.add_api_route(
+    "/api/search",
+    vms.search_vms,
+    methods=["GET"],
+    tags=["VMs"],
+    summary="Search VMs",
+)
+
 # TODO: Import and include remaining API routers
 # from vmledger.api import metrics, alerts
 # app.include_router(metrics.router, prefix="/api/metrics", tags=["Metrics"])

@@ -137,6 +137,11 @@ class VMResponseSchema(BaseModel):
     latest_ram_total: Optional[int] = None
     latest_disk_percent: Optional[float] = None
     
+    # DNS resolution tracking
+    resolved_ip: Optional[str] = None
+    dns_last_checked: Optional[datetime] = None
+    dns_mismatch: Optional[bool] = None
+    
     model_config = {
         "from_attributes": True
     }

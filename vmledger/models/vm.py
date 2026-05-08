@@ -51,6 +51,11 @@ class VM(Base):
     last_seen = Column(DateTime(timezone=True), nullable=True)
     is_reachable = Column(Boolean, nullable=True)
     
+    # DNS resolution tracking
+    resolved_ip = Column(String(45), nullable=True)  # Last resolved IP from hostname
+    dns_last_checked = Column(DateTime(timezone=True), nullable=True)  # When DNS was last checked
+    dns_mismatch = Column(Boolean, nullable=True, default=False)  # True if resolved_ip != ip_address
+    
     # Constraints
     __table_args__ = (
         UniqueConstraint('user_id', 'ip_address', 'ssh_port', name='unique_vm_per_user'),
