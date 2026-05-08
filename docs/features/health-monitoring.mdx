@@ -6,12 +6,13 @@ icon: 'heart-pulse'
 
 ## Overview
 
-Health Monitoring is VMLedger's continuous surveillance system that watches your VMs 24/7. It combines two powerful monitoring techniques:
+Health Monitoring is VMLedger's continuous surveillance system that watches your VMs 24/7. It combines three powerful monitoring techniques:
 1. **Health Checks** - Quick connectivity tests every 60 seconds
 2. **Metrics Collection** - Detailed resource usage every 5 minutes
+3. **DNS Drift Detection** - Continuous hostname resolution checks every 6 hours
 
 <Info>
-**Real-World Analogy**: Think of health monitoring like a hospital's patient monitoring system. The heart rate monitor (health checks) beeps every second to confirm the patient is alive, while the nurse (metrics collection) comes by every few minutes to check temperature, blood pressure, and other vitals.
+**Real-World Analogy**: Think of health monitoring like a hospital's patient monitoring system. The heart rate monitor (health checks) beeps every second to confirm the patient is alive, the nurse (metrics collection) comes by every few minutes to check vitals, and the administration checks ID badges (DNS drift detection) daily to ensure everyone is who they say they are.
 </Info>
 
 ## Monitoring Architecture
@@ -499,17 +500,57 @@ flowchart LR
 ```
 
 **Dashboard Display:**
+
+```mermaid
+graph LR
+    subgraph card["VM Card: web-server-01"]
+        direction TB
+        status["🟢 Online · 192.168.1.100"]
+        cpu["CPU: 45.2% ▓▓▓▓▓▓▓▓░░"]
+        ram["RAM: 50.0% ▓▓▓▓▓░░░░░"]
+        disk["Disk: 67.5% ▓▓▓▓▓▓▓░░░"]
+        seen["Last seen: 2 minutes ago"]
+        actions["Edit | Metrics"]
+    end
+
+    style card fill:#1e293b,stroke:#334155,color:#f8fafc
+    style status fill:#1e293b,stroke:none,color:#22c55e
+    style cpu fill:#1e293b,stroke:none,color:#14b8a6
+    style ram fill:#1e293b,stroke:none,color:#3b82f6
+    style disk fill:#1e293b,stroke:none,color:#10b981
+    style seen fill:#1e293b,stroke:none,color:#6b7280
+    style actions fill:#1e293b,stroke:none,color:#14b8a6
 ```
-┌─────────────────────────────────────────┐
-│ 🟢 web-server-01 (192.168.1.100)       │
-├─────────────────────────────────────────┤
-│ CPU:  45.2% ████████░░░░░░░░░░░░        │
-│ RAM:  50.0% (2048 MB / 4096 MB)         │
-│ Disk: 67.5% ██████████████░░░░░░        │
-│                                         │
-│ Last seen: 2 minutes ago                │
-└─────────────────────────────────────────┘
-```
+
+### Dashboard View Modes
+
+The dashboard supports **6 different visualization modes** to suit different operational workflows:
+
+<CardGroup cols={3}>
+  <Card title="Grid View" icon="grid-2">
+    Standard card layout with full metrics (CPU, RAM, Disk), tags, and action buttons. Best for monitoring a small-to-medium fleet.
+  </Card>
+  
+  <Card title="List View" icon="list">
+    Compact horizontal rows with inline progress bars. Best for scanning many VMs quickly.
+  </Card>
+  
+  <Card title="Table View" icon="table">
+    Dense data table with sortable columns (Status, Hostname, IP, CPU, Memory, Disk). Best for large fleets and data exports.
+  </Card>
+  
+  <Card title="Status Board (Kanban)" icon="columns-3">
+    Groups VMs into columns by status: Online, Offline, and Unknown. Best for incident response and triage.
+  </Card>
+  
+  <Card title="Minimal View" icon="minus">
+    Stripped-down list showing only hostname, IP, and status dot. Best for ultra-clean dashboards.
+  </Card>
+  
+  <Card title="Analytics Summary" icon="chart-pie">
+    Fleet-level aggregated statistics: total VM counts, online/offline ratio, average CPU, and top consumers. Best for management reporting.
+  </Card>
+</CardGroup>
 
 ### Auto-Refresh
 

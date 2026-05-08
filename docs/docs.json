@@ -1,0 +1,154 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "VMLedger Documentation",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/virtual-machines",
+              "concepts/monitoring",
+              "concepts/authentication",
+              "concepts/deployments"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/vm-management",
+              "features/health-monitoring",
+              "features/alerting",
+              "features/search-engine",
+              "features/deployment-tracking"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/overview",
+              "deployment/docker-compose",
+              "deployment/production",
+              "deployment/environment-variables"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/adding-vms",
+              "guides/setting-up-monitoring",
+              "guides/configuring-alerts",
+              "guides/managing-deployments",
+              "guides/password-fix"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Documentation",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication",
+              "api-reference/virtual-machines",
+              "api-reference/monitoring",
+              "api-reference/deployments",
+              "api-reference/alerts",
+              "api-reference/search"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Architecture",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/backend",
+              "architecture/frontend",
+              "architecture/database",
+              "architecture/caching",
+              "architecture/task-queue",
+              "architecture/security"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/docker",
+              "development/testing",
+              "development/contributing",
+              "development/troubleshooting"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/yourusername/vmledger",
+          "icon": "github"
+        },
+        {
+          "anchor": "Community",
+          "href": "https://vmledger.slack.com",
+          "icon": "slack"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@vmledger.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "http://localhost:3000"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/yourusername/vmledger",
+      "linkedin": "https://www.linkedin.com/company/vmledger"
+    }
+  }
+}

@@ -10,26 +10,27 @@ VMLedger follows a modern microservices-inspired architecture with clear separat
 ```mermaid
 graph TB
     subgraph "Frontend Layer"
-        UI[Next.js Frontend<br/>Port 3000]
+        UI["Next.js Frontend<br/>Port 3000<br/>6 View Modes"]
     end
     
     subgraph "API Layer"
-        API[FastAPI Backend<br/>Port 8000]
+        API["FastAPI Backend<br/>Port 8000"]
     end
     
     subgraph "Task Queue"
-        CELERY[Celery Workers]
-        BEAT[Celery Beat Scheduler]
+        CELERY["Celery Workers"]
+        BEAT["Celery Beat Scheduler"]
     end
     
     subgraph "Data Layer"
-        PG[(PostgreSQL<br/>Port 5432)]
-        REDIS[(Redis<br/>Port 6379)]
+        PG[("PostgreSQL<br/>Port 5432")]
+        REDIS[("Redis<br/>Port 6379")]
     end
     
     subgraph "External Systems"
-        VMS[Virtual Machines]
-        WEBHOOKS[Webhook Endpoints<br/>Slack, Discord, etc.]
+        VMS["Virtual Machines"]
+        WEBHOOKS["Webhook Endpoints<br/>Slack, Discord, etc."]
+        DNS["DNS Servers"]
     end
     
     UI -->|HTTP/REST| API
@@ -40,6 +41,7 @@ graph TB
     CELERY -->|Read/Write| PG
     CELERY -->|SSH| VMS
     CELERY -->|HTTP POST| WEBHOOKS
+    CELERY -->|DNS Resolve| DNS
     BEAT -->|Schedule Tasks| REDIS
 ```
 
@@ -356,41 +358,62 @@ graph LR
 
 ### Development
 
-```
-┌─────────────────────────────────────┐
-│         Docker Compose              │
-├─────────────────────────────────────┤
-│ ┌─────────┐ ┌──────────┐ ┌────────┐│
-│ │Frontend │ │  API     │ │ Celery ││
-│ │(npm dev)│ │(uvicorn) │ │Workers ││
-│ └─────────┘ └──────────┘ └────────┘│
-│ ┌──────────┐ ┌──────────┐          │
-│ │PostgreSQL│ │  Redis   │          │
-│ └──────────┘ └──────────┘          │
-└─────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph DC["Docker Compose (Development)"]
+        direction TB
+        subgraph apps["Application Services"]
+            FE["Frontend<br/>npm dev<br/>Port 3000"]
+            API2["FastAPI<br/>uvicorn<br/>Port 8000"]
+            CW["Celery Workers"]
+            CB["Celery Beat"]
+        end
+        subgraph data["Data Services"]
+            PG2[("PostgreSQL<br/>Port 5432")]
+            RD2[("Redis<br/>Port 6379")]
+        end
+    end
+
+    FE --> API2
+    API2 --> PG2
+    API2 --> RD2
+    CW --> PG2
+    CW --> RD2
+    CB --> RD2
 ```
 
 ### Production
 
-```
-┌─────────────────────────────────────────┐
-│         Load Balancer (Nginx)           │
-└────────────┬────────────────────────────┘
-             │
-    ┌────────┴────────┐
-    │                 │
-┌───▼────┐      ┌────▼───┐
-│ API 1  │      │ API 2  │
-└───┬────┘      └────┬───┘
-    │                │
-    └────────┬───────┘
-             │
-    ┌────────▼────────┐
-    │                 │
-┌───▼────────┐  ┌────▼──────┐
-│ PostgreSQL │  │   Redis   │
-│  (Primary) │  │ (Cluster) │
-└────────────┘  └───────────┘
+```mermaid
+graph TB
+    LB["Load Balancer<br/>(Nginx)"]
+    
+    subgraph api_cluster["API Cluster"]
+        API1["API Instance 1"]
+        API22["API Instance 2"]
+    end
+    
+    subgraph worker_pool["Worker Pool"]
+        W1["Worker 1"]
+        W2["Worker 2"]
+        W3["Worker N"]
+    end
+    
+    subgraph data_layer["Data Layer"]
+        PG3[("PostgreSQL<br/>Primary")]
+        RD3[("Redis<br/>Cluster")]
+    end
+
+    LB --> API1
+    LB --> API22
+    API1 --> PG3
+    API1 --> RD3
+    API22 --> PG3
+    API22 --> RD3
+    W1 --> PG3
+    W1 --> RD3
+    W2 --> PG3
+    W3 --> RD3
 ```
 
 ## Technology Choices

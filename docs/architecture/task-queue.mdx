@@ -6,39 +6,64 @@ icon: 'list-check'
 
 ## Overview
 
-VMLedger uses Celery with Redis as the message broker for asynchronous background tasks.
+VMLedger uses Celery with Redis as the message broker for asynchronous background tasks. The task queue powers all automated monitoring, DNS resolution, alerting, and data cleanup operations.
 
 ## Components
 
 <CardGroup cols={3}>
   <Card title="Celery Beat" icon="clock">
-    Task scheduler (cron-like)
+    Task scheduler (cron-like). Dispatches periodic jobs on configurable intervals.
   </Card>
   
   <Card title="Celery Workers" icon="users">
-    Task executors (10 concurrent)
+    Task executors (10 concurrent by default). Execute ping checks, metrics collection, DNS resolution, and alerts.
   </Card>
   
   <Card title="Redis Queue" icon="list">
-    Message broker
+    Message broker and result backend. Manages task distribution and stores results.
   </Card>
 </CardGroup>
+
+## Task Flow
+
+```mermaid
+graph LR
+    Beat["Celery Beat<br/>(Scheduler)"] -->|Enqueue| Redis[("Redis<br/>Queue")]
+    Redis -->|Dequeue| W1["Worker 1"]
+    Redis -->|Dequeue| W2["Worker 2"]
+    Redis -->|Dequeue| W3["Worker N"]
+    
+    W1 -->|Results| DB[("PostgreSQL")]
+    W2 -->|Results| DB
+    W3 -->|Results| DB
+    
+    style Beat fill:#3b82f6,color:#fff
+    style Redis fill:#f59e0b,color:#fff
+    style W1 fill:#10b981,color:#fff
+    style W2 fill:#10b981,color:#fff
+    style W3 fill:#10b981,color:#fff
+    style DB fill:#8b5cf6,color:#fff
+```
 
 ## Task Schedule
 
 ```python
 CELERY_BEAT_SCHEDULE = {
     'ping-all-vms': {
-        'task': 'tasks.schedule_ping_checks',
+        'task': 'vmledger.tasks.schedule_ping_checks',
         'schedule': 60.0,  # Every 60 seconds
     },
     'collect-all-metrics': {
-        'task': 'tasks.schedule_metric_collection',
+        'task': 'vmledger.tasks.schedule_metric_collection',
         'schedule': 300.0,  # Every 5 minutes
     },
     'cleanup-old-data': {
-        'task': 'tasks.cleanup_historical_data',
-        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM
+        'task': 'vmledger.tasks.cleanup_historical_data',
+        'schedule': crontab(hour=2, minute=0),  # Daily at 2 AM UTC
+    },
+    'dns-resolve-all-vms': {
+        'task': 'vmledger.tasks.schedule_dns_resolution',
+        'schedule': crontab(hour='*/6', minute=15),  # Every 6 hours
     },
 }
 ```
@@ -52,10 +77,43 @@ CELERY_BEAT_SCHEDULE = {
 - Retries: 3 attempts
 
 ### Metrics Collection Task
-- SSH-based resource metrics
+- SSH-based resource metrics (CPU, RAM, Disk)
 - Runs every 5 minutes per VM
 - Timeout: 120 seconds
 - Retries: 3 attempts
+
+### DNS Resolution Task
+- Resolves VM hostname to IP via `socket.getaddrinfo`
+- Compares resolved IP against the stored (registered) IP
+- Flags `dns_mismatch = True` when the IP has drifted
+- Runs every 6 hours for all VMs
+- Timeout: 60 seconds
+- Retries: 2 attempts
+
+```mermaid
+sequenceDiagram
+    participant Beat as Celery Beat
+    participant Worker as Celery Worker
+    participant DNS as DNS Server
+    participant DB as PostgreSQL
+
+    Note over Beat: Every 6 hours
+    Beat->>Worker: schedule_dns_resolution
+    Worker->>DB: Get all VMs
+    DB-->>Worker: VM list (hostname, ip_address)
+    
+    loop For each VM
+        Worker->>DNS: Resolve hostname
+        DNS-->>Worker: Resolved IP
+        
+        alt IP matches
+            Worker->>DB: Update dns_last_checked, dns_mismatch=false
+        else IP differs
+            Worker->>DB: Update resolved_ip, dns_mismatch=true
+            Note over Worker: Log DNS drift warning
+        end
+    end
+```
 
 ### Alert Task
 - Sends webhook/email notifications
@@ -63,12 +121,35 @@ CELERY_BEAT_SCHEDULE = {
 - Timeout: 30 seconds
 - Retries: 3 attempts with exponential backoff
 
+### Data Cleanup Task
+- Removes old ping results (>100 per VM)
+- Removes old metrics (>1000 per VM)
+- Removes old alerts (>100 per VM)
+- Runs daily at 2 AM UTC
+
 ## Concurrency
 
+```mermaid
+gantt
+    title Monitoring 50 VMs with 10 Workers
+    dateFormat mm:ss
+    axisFormat %M:%S
+    
+    section Ping Checks
+    Batch 1 (VMs 1-10)     :00:00, 6s
+    Batch 2 (VMs 11-20)    :00:06, 6s
+    Batch 3 (VMs 21-30)    :00:12, 6s
+    Batch 4 (VMs 31-40)    :00:18, 6s
+    Batch 5 (VMs 41-50)    :00:24, 6s
+    
+    section Complete
+    All Done               :milestone, 00:30, 0s
 ```
-10 workers × 50 VMs = 5 minutes per monitoring cycle
-20 workers × 100 VMs = 5 minutes per monitoring cycle
-```
+
+**Performance Characteristics:**
+- **50 VMs**: Complete cycle in ~30 seconds
+- **100 VMs**: Complete cycle in ~60 seconds
+- **200 VMs**: Complete cycle in ~120 seconds
 
 ## Scaling Workers
 
@@ -78,6 +159,10 @@ celery-worker:
   command: celery -A vmledger.celery_app worker --concurrency=20
 ```
 
+<Warning>
+When scaling workers, ensure your PostgreSQL connection pool and Redis connections can handle the increased load. Rule of thumb: 1 worker per 5-10 VMs.
+</Warning>
+
 ## Next Steps
 
 <CardGroup cols={2}>
@@ -86,6 +171,6 @@ celery-worker:
   </Card>
   
   <Card title="Monitoring" icon="heart-pulse" href="/features/health-monitoring">
-    Monitoring features
+    Monitoring features and dashboard views
   </Card>
 </CardGroup>
