@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, tokenManager } from '@/lib/api-client';
 import type { LoginRequest, RegisterRequest } from '@/types/api';
@@ -61,9 +62,19 @@ export function useLogout() {
  * Hook to check authentication status
  */
 export function useAuth() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+  const logout = useLogout();
+
+  useEffect(() => {
+    setIsMounted(true);
+    setIsAuthenticated(tokenManager.isAuthenticated());
+  }, []);
+
   return {
-    isAuthenticated: tokenManager.isAuthenticated(),
-    token: tokenManager.getToken(),
-    logout: useLogout(),
+    isAuthenticated: isMounted ? isAuthenticated : false,
+    token: isMounted ? tokenManager.getToken() : null,
+    logout,
+    isMounted,
   };
 }

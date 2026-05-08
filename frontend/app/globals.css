@@ -2,26 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #030712;
+    --foreground: #f9fafb;
+  }
+
+  body {
+    @apply bg-[#030712] text-gray-100 antialiased selection:bg-brand-500/30 selection:text-brand-200;
+    /* Beautiful subtle gradient background */
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(55, 65, 81, 0.15) 0px, transparent 50%);
+    background-attachment: fixed;
+    min-height: 100vh;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .glass-card {
+    @apply relative overflow-hidden rounded-2xl border border-white/10 bg-surface-900/40 backdrop-blur-xl shadow-2xl transition-all duration-300;
+  }
+  
+  .glass-card:hover {
+    @apply border-white/20 shadow-brand-500/5;
+  }
+
+  .glass-panel {
+    @apply rounded-xl border border-white/5 bg-white/5 backdrop-blur-md;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-brand-500/40 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-surface-900;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-white/10 bg-surface-800/50 px-6 py-2.5 text-sm font-semibold text-gray-300 backdrop-blur-md transition-all duration-300 hover:border-white/20 hover:bg-surface-700/50 hover:text-white active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-surface-900;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-red-600 to-red-500 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-500/25 transition-all duration-300 hover:scale-[1.02] hover:shadow-red-500/40 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-surface-900;
+  }
+
+  .input-premium {
+    @apply w-full rounded-xl border border-white/10 bg-surface-900/50 px-4 py-3 text-gray-200 backdrop-blur-sm transition-all duration-300 placeholder:text-gray-500 focus:border-brand-500 focus:bg-surface-900/80 focus:outline-none focus:ring-1 focus:ring-brand-500;
+  }
+  
+  .status-badge-online {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-brand-500/30 bg-brand-500/10 text-brand-400 backdrop-blur-md;
+  }
+
+  .status-badge-offline {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-red-500/30 bg-red-500/10 text-red-400 backdrop-blur-md;
+  }
+
+  .status-badge-unknown {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-gray-500/30 bg-gray-500/10 text-gray-400 backdrop-blur-md;
+  }
+
+  .nav-link {
+    @apply text-sm font-medium text-gray-400 transition-colors hover:text-white;
+  }
+  
+  .nav-link-active {
+    @apply text-sm font-medium text-brand-400;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-300 to-brand-500;
   }
 }

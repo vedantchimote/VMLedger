@@ -16,7 +16,8 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "VMLedger - VM Infrastructure Management",
-  description: "Lightweight CMDB and monitoring tool for personal VM infrastructure",
+  description:
+    "Lightweight CMDB and monitoring tool for personal VM infrastructure",
 };
 
 export default function RootLayout({
@@ -29,9 +30,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <QueryProvider>
-          {children}
-        </QueryProvider>
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

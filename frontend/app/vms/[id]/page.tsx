@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
-import { formatDistanceToNow, format } from 'date-fns';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import { formatDistanceToNow, format } from "date-fns";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   LineChart,
   Line,
@@ -15,37 +15,50 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts';
-import { useAuth } from '@/lib/hooks/use-auth';
-import { useVM } from '@/lib/hooks/use-vms';
-import { useVMMetrics, useVMPingHistory } from '@/lib/hooks/use-monitoring';
-import { useAlertConfig, useAlertHistory, useUpdateAlertConfig } from '@/lib/hooks/use-alerts';
-import type { Metric, PingResult, VM, Alert, AlertConfig } from '@/types/api';
-import { isValidWebhookURL, isValidEmail, isValidCooldownPeriod } from '@/lib/validation';
+} from "recharts";
+import { useAuth } from "@/lib/hooks/use-auth";
+import { useVM } from "@/lib/hooks/use-vms";
+import { useVMMetrics, useVMPingHistory } from "@/lib/hooks/use-monitoring";
+import {
+  useAlertConfig,
+  useAlertHistory,
+  useUpdateAlertConfig,
+} from "@/lib/hooks/use-alerts";
+import type { Metric, PingResult, VM, Alert, AlertConfig } from "@/types/api";
+import {
+  isValidWebhookURL,
+  isValidEmail,
+  isValidCooldownPeriod,
+} from "@/lib/validation";
 
-type TabType = 'overview' | 'metrics' | 'ping' | 'notes' | 'alerts';
+type TabType = "overview" | "metrics" | "ping" | "notes" | "alerts";
 
 export default function VMDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const vmId = parseInt(params.id as string, 10);
-  const { isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const { isAuthenticated, isMounted } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
 
   // Fetch VM data
   const { data: vm, isLoading: vmLoading, isError: vmError } = useVM(vmId);
   const { data: metrics, isLoading: metricsLoading } = useVMMetrics(vmId, 100);
-  const { data: pingHistory, isLoading: pingLoading } = useVMPingHistory(vmId, 100);
-  const { data: alertConfig, isLoading: alertConfigLoading } = useAlertConfig(vmId);
-  const { data: alertHistory, isLoading: alertHistoryLoading } = useAlertHistory(vmId);
+  const { data: pingHistory, isLoading: pingLoading } = useVMPingHistory(
+    vmId,
+    100,
+  );
+  const { data: alertConfig, isLoading: alertConfigLoading } =
+    useAlertConfig(vmId);
+  const { data: alertHistory, isLoading: alertHistoryLoading } =
+    useAlertHistory(vmId);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
+    if (isMounted && !isAuthenticated) {
+      router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isMounted, router]);
 
-  if (!isAuthenticated) {
+  if (!isMounted || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-white">Loading...</div>
@@ -92,7 +105,8 @@ export default function VMDetailsPage() {
           <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-6">
             <h3 className="text-red-200 font-semibold mb-2">VM Not Found</h3>
             <p className="text-red-300 text-sm mb-4">
-              The requested VM could not be found or you don&apos;t have permission to view it.
+              The requested VM could not be found or you don&apos;t have
+              permission to view it.
             </p>
             <Link
               href="/dashboard"
@@ -107,40 +121,40 @@ export default function VMDetailsPage() {
   }
 
   const getStatusColor = (isReachable: boolean | undefined): string => {
-    if (isReachable === true) return 'bg-green-500';
-    if (isReachable === false) return 'bg-red-500';
-    return 'bg-gray-500';
+    if (isReachable === true) return "bg-green-500";
+    if (isReachable === false) return "bg-red-500";
+    return "bg-gray-500";
   };
 
   const getStatusText = (isReachable: boolean | undefined): string => {
-    if (isReachable === true) return 'Online';
-    if (isReachable === false) return 'Offline';
-    return 'Unknown';
+    if (isReachable === true) return "Online";
+    if (isReachable === false) return "Offline";
+    return "Unknown";
   };
 
   const formatRelativeTime = (timestamp: string | undefined): string => {
-    if (!timestamp) return 'Never';
+    if (!timestamp) return "Never";
     try {
       return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
     } catch {
-      return 'Unknown';
+      return "Unknown";
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-surface-950/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
+          <div className="flex justify-between items-center h-20">
+            <div className="flex items-center gap-6">
               <Link
                 href="/dashboard"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-surface-800 border border-white/5 text-gray-400 hover:text-white hover:bg-surface-700 transition-all hover:scale-105"
                 aria-label="Back to Dashboard"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="w-5 h-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -153,18 +167,48 @@ export default function VMDetailsPage() {
                   />
                 </svg>
               </Link>
-              <h1 className="text-2xl font-bold text-white">{vm.hostname}</h1>
-              <div
-                className={`w-3 h-3 rounded-full ${getStatusColor(vm.is_reachable)} shadow-lg`}
-                title={getStatusText(vm.is_reachable)}
-              ></div>
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h1 className="text-2xl font-bold text-white tracking-tight">
+                    {vm.hostname}
+                  </h1>
+                  <span
+                    className={
+                      vm.is_reachable === true
+                        ? "status-badge-online"
+                        : vm.is_reachable === false
+                          ? "status-badge-offline"
+                          : "status-badge-unknown"
+                    }
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        vm.is_reachable === true
+                          ? "bg-brand-500 animate-pulse"
+                          : vm.is_reachable === false
+                            ? "bg-red-500"
+                            : "bg-gray-500"
+                      }`}
+                    ></span>
+                    {getStatusText(vm.is_reachable)}
+                  </span>
+                </div>
+                <div className="text-sm font-mono text-gray-400">
+                  {vm.ip_address}
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-4">
-              <Link
-                href={`/vms/${vm.id}/edit`}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
-              >
-                Edit VM
+              <Link href={`/vms/${vm.id}/edit`} className="btn-secondary flex items-center gap-2">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit Configuration
               </Link>
             </div>
           </div>
@@ -172,54 +216,76 @@ export default function VMDetailsPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
         {/* VM Metadata Section */}
-        <div className="bg-gray-800 rounded-lg shadow-xl border border-gray-700 p-6 mb-6">
-          <h2 className="text-xl font-bold text-white mb-4">VM Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="glass-card p-8 mb-8">
+          <h2 className="text-xl font-bold text-white tracking-tight mb-6 flex items-center">
+            <svg
+              className="w-5 h-5 mr-2 text-brand-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            System Information
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6">
             <div>
-              <p className="text-sm text-gray-400 mb-1">IP Address</p>
-              <p className="text-white font-medium">{vm.ip_address}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                Network Interface
+              </p>
+              <p className="text-white font-mono text-sm">{vm.ip_address}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-400 mb-1">SSH Port</p>
-              <p className="text-white font-medium">{vm.ssh_port}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                SSH Port
+              </p>
+              <p className="text-white font-mono text-sm">{vm.ssh_port}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-400 mb-1">Domain</p>
-              <p className="text-white font-medium">{vm.domain || 'N/A'}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                Domain Name
+              </p>
+              <p className="text-white text-sm">
+                {vm.domain || (
+                  <span className="text-gray-600 italic">Not configured</span>
+                )}
+              </p>
             </div>
             <div>
-              <p className="text-sm text-gray-400 mb-1">Status</p>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  vm.is_reachable === true
-                    ? 'bg-green-900/50 text-green-200 border border-green-500/50'
-                    : vm.is_reachable === false
-                    ? 'bg-red-900/50 text-red-200 border border-red-500/50'
-                    : 'bg-gray-700 text-gray-300 border border-gray-600'
-                }`}
-              >
-                {getStatusText(vm.is_reachable)}
-              </span>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                Last Seen
+              </p>
+              <p className="text-white text-sm">
+                {formatRelativeTime(vm.last_seen)}
+              </p>
             </div>
             <div>
-              <p className="text-sm text-gray-400 mb-1">Last Seen</p>
-              <p className="text-white font-medium">{formatRelativeTime(vm.last_seen)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-400 mb-1">Created</p>
-              <p className="text-white font-medium">{formatRelativeTime(vm.created_at)}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                Created
+              </p>
+              <p className="text-white text-sm">
+                {formatRelativeTime(vm.created_at)}
+              </p>
             </div>
           </div>
           {vm.tags && vm.tags.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm text-gray-400 mb-2">Tags</p>
-              <div className="flex flex-wrap gap-2">
+            <div className="mt-8 pt-6 border-t border-white/5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tags
+                </span>
+                <div className="h-4 w-px bg-white/10 mx-1"></div>
                 {vm.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="px-3 py-1 bg-blue-900/50 text-blue-200 border border-blue-500/50 rounded-full text-xs font-medium"
+                    className="px-3 py-1 bg-brand-500/10 text-brand-300 border border-brand-500/20 rounded-lg text-xs font-semibold tracking-wider uppercase shadow-inner"
                   >
                     {tag}
                   </span>
@@ -229,77 +295,134 @@ export default function VMDetailsPage() {
           )}
         </div>
 
+        {/* DNS Resolution Status */}
+        <div className="glass-card p-8 mb-8">
+          <h2 className="text-xl font-bold text-white tracking-tight mb-6 flex items-center">
+            <svg
+              className="w-5 h-5 mr-2 text-brand-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+              />
+            </svg>
+            DNS Resolution
+            {vm.dns_mismatch && (
+              <span className="ml-3 px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                IP Mismatch Detected
+              </span>
+            )}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Registered IP
+              </p>
+              <p className="text-white font-mono text-sm font-bold">{vm.ip_address}</p>
+            </div>
+            <div className={`rounded-xl p-5 border ${vm.dns_mismatch ? "bg-yellow-500/5 border-yellow-500/20" : "bg-surface-900/50 border-white/5"}`}>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Resolved IP (from hostname)
+              </p>
+              {vm.resolved_ip ? (
+                <p className={`font-mono text-sm font-bold ${vm.dns_mismatch ? "text-yellow-400" : "text-brand-400"}`}>
+                  {vm.resolved_ip}
+                  {vm.dns_mismatch && (
+                    <span className="ml-2 text-yellow-500 text-[10px] font-semibold uppercase">
+                      ≠ registered
+                    </span>
+                  )}
+                  {!vm.dns_mismatch && vm.resolved_ip && (
+                    <span className="ml-2 text-brand-500 text-[10px] font-semibold uppercase">
+                      ✓ matches
+                    </span>
+                  )}
+                </p>
+              ) : (
+                <p className="text-gray-600 italic text-sm">Not yet checked</p>
+              )}
+            </div>
+            <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Last DNS Check
+              </p>
+              <p className="text-white text-sm">
+                {vm.dns_last_checked
+                  ? formatRelativeTime(vm.dns_last_checked)
+                  : <span className="text-gray-600 italic">Pending first check</span>
+                }
+              </p>
+              <p className="text-[10px] text-gray-600 mt-1 uppercase tracking-wider">
+                Checked every 6 hours
+              </p>
+            </div>
+          </div>
+          {vm.dns_mismatch && (
+            <div className="mt-4 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl flex items-start gap-3">
+              <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <div>
+                <p className="text-sm font-bold text-yellow-400 mb-1">DNS Drift Warning</p>
+                <p className="text-xs text-yellow-400/80">
+                  The hostname <span className="font-mono font-bold">{vm.hostname}</span> now resolves
+                  to <span className="font-mono font-bold">{vm.resolved_ip}</span> instead
+                  of the registered IP <span className="font-mono font-bold">{vm.ip_address}</span>.
+                  Consider updating the VM&apos;s IP address if this change is intentional.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Tabbed Interface */}
-        <div className="bg-gray-800 rounded-lg shadow-xl border border-gray-700">
+        <div className="glass-card overflow-visible">
           {/* Tab Headers */}
-          <div className="border-b border-gray-700">
-            <nav className="flex -mb-px">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'overview'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('metrics')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'metrics'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                Metrics
-              </button>
-              <button
-                onClick={() => setActiveTab('ping')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'ping'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                Ping History
-              </button>
-              <button
-                onClick={() => setActiveTab('notes')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'notes'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                Deployment Notes
-              </button>
-              <button
-                onClick={() => setActiveTab('alerts')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'alerts'
-                    ? 'border-blue-500 text-blue-400'
-                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                Alerts
-              </button>
+          <div className="border-b border-white/5 bg-surface-900/50">
+            <nav className="flex overflow-x-auto hide-scrollbar">
+              {["overview", "metrics", "ping", "notes", "alerts"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as TabType)}
+                  className={`px-8 py-5 text-sm font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${
+                    activeTab === tab
+                      ? "border-brand-400 text-brand-400 bg-brand-500/5"
+                      : "border-transparent text-gray-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {tab.replace("_", " ")}
+                </button>
+              ))}
             </nav>
           </div>
 
           {/* Tab Content */}
-          <div className="p-6">
-            {activeTab === 'overview' && (
-              <OverviewTab vm={vm} metrics={metrics} pingHistory={pingHistory} />
+          <div className="p-8">
+            {activeTab === "overview" && (
+              <OverviewTab
+                vm={vm}
+                metrics={metrics}
+                pingHistory={pingHistory}
+              />
             )}
-            {activeTab === 'metrics' && (
+            {activeTab === "metrics" && (
               <MetricsTab metrics={metrics} isLoading={metricsLoading} />
             )}
-            {activeTab === 'ping' && (
-              <PingHistoryTab pingHistory={pingHistory} isLoading={pingLoading} />
+            {activeTab === "ping" && (
+              <PingHistoryTab
+                pingHistory={pingHistory}
+                isLoading={pingLoading}
+              />
             )}
-            {activeTab === 'notes' && <DeploymentNotesTab notes={vm.deployment_notes} />}
-            {activeTab === 'alerts' && (
+            {activeTab === "notes" && (
+              <DeploymentNotesTab notes={vm.deployment_notes} />
+            )}
+            {activeTab === "alerts" && (
               <AlertsTab
                 vmId={vmId}
                 alertConfig={alertConfig}
@@ -329,93 +452,203 @@ function OverviewTab({
   const recentPings = pingHistory ? pingHistory.slice(0, 10) : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
       {/* Current Status Summary */}
       <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Current Status</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-750 rounded-lg p-4 border border-gray-700">
-            <p className="text-sm text-gray-400 mb-1">CPU Usage</p>
-            <p className="text-2xl font-bold text-white">
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+          Resource Utilization
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="glass-panel p-6 border-brand-500/10 hover:border-brand-500/30 transition-all">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                CPU Usage
+              </p>
+            </div>
+            <p className="text-3xl font-bold text-white font-mono">
               {latestMetric?.cpu_usage_percent !== undefined
                 ? `${latestMetric.cpu_usage_percent.toFixed(1)}%`
-                : 'N/A'}
+                : "N/A"}
             </p>
           </div>
-          <div className="bg-gray-750 rounded-lg p-4 border border-gray-700">
-            <p className="text-sm text-gray-400 mb-1">RAM Usage</p>
-            <p className="text-2xl font-bold text-white">
-              {latestMetric?.ram_used_mb !== undefined && latestMetric?.ram_total_mb !== undefined
-                ? `${latestMetric.ram_used_mb} / ${latestMetric.ram_total_mb} MB`
-                : 'N/A'}
+          <div className="glass-panel p-6 border-brand-500/10 hover:border-brand-500/30 transition-all">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                RAM Usage
+              </p>
+            </div>
+            <p className="text-3xl font-bold text-white font-mono">
+              {latestMetric?.ram_used_mb !== undefined &&
+              latestMetric?.ram_total_mb !== undefined
+                ? `${Math.round((latestMetric.ram_used_mb / latestMetric.ram_total_mb) * 100)}%`
+                : "N/A"}
+            </p>
+            <p className="text-xs text-gray-500 mt-1 font-mono">
+              {latestMetric?.ram_used_mb !== undefined &&
+              latestMetric?.ram_total_mb !== undefined
+                ? `${latestMetric.ram_used_mb}MB / ${latestMetric.ram_total_mb}MB`
+                : ""}
             </p>
           </div>
-          <div className="bg-gray-750 rounded-lg p-4 border border-gray-700">
-            <p className="text-sm text-gray-400 mb-1">Disk Usage</p>
-            <p className="text-2xl font-bold text-white">
+          <div className="glass-panel p-6 border-brand-500/10 hover:border-brand-500/30 transition-all">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+                Disk Usage
+              </p>
+            </div>
+            <p className="text-3xl font-bold text-white font-mono">
               {latestMetric?.disk_usage_percent !== undefined
                 ? `${latestMetric.disk_usage_percent.toFixed(1)}%`
-                : 'N/A'}
+                : "N/A"}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Recent Ping Results */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Recent Ping Results</h3>
-        {recentPings.length > 0 ? (
-          <div className="space-y-2">
-            {recentPings.map((ping) => (
-              <div
-                key={ping.id}
-                className={`flex items-center justify-between p-3 rounded-lg border ${
-                  ping.success
-                    ? 'bg-green-900/20 border-green-500/30'
-                    : 'bg-red-900/20 border-red-500/30'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      ping.success ? 'bg-green-500' : 'bg-red-500'
-                    }`}
-                  ></div>
-                  <span className="text-sm text-gray-300">
-                    {format(new Date(ping.timestamp), 'PPpp')}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-400">
-                  {ping.success
-                    ? `${ping.response_time_ms?.toFixed(0)}ms`
-                    : ping.error_type || 'Failed'}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-400 text-sm">No ping data available</p>
-        )}
-      </div>
-
-      {/* Deployment Notes Preview */}
-      {vm.deployment_notes && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Ping Results */}
         <div>
-          <h3 className="text-lg font-semibold text-white mb-4">Deployment Notes Preview</h3>
-          <div className="bg-gray-750 rounded-lg p-4 border border-gray-700">
-            <div className="text-gray-300 text-sm line-clamp-6">
-              {vm.deployment_notes.substring(0, 300)}
-              {vm.deployment_notes.length > 300 && '...'}
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+            Connectivity Log
+          </h3>
+          {recentPings.length > 0 ? (
+            <div className="space-y-3">
+              {recentPings.map((ping) => (
+                <div
+                  key={ping.id}
+                  className={`flex items-center justify-between p-4 rounded-xl border backdrop-blur-sm transition-all ${
+                    ping.success
+                      ? "bg-brand-500/5 border-brand-500/20 hover:border-brand-500/40"
+                      : "bg-red-500/5 border-red-500/20 hover:border-red-500/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`p-2 rounded-lg ${ping.success ? "bg-brand-500/10" : "bg-red-500/10"}`}
+                    >
+                      <svg
+                        className={`w-4 h-4 ${ping.success ? "text-brand-400" : "text-red-400"}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        {ping.success ? (
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        ) : (
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        )}
+                      </svg>
+                    </div>
+                    <div>
+                      <span className="block text-sm font-medium text-gray-200">
+                        {format(new Date(ping.timestamp), "MMM d, yyyy")}
+                      </span>
+                      <span className="block text-xs text-gray-500">
+                        {format(new Date(ping.timestamp), "HH:mm:ss")}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className={`text-sm font-mono font-bold ${ping.success ? "text-brand-300" : "text-red-400"}`}
+                  >
+                    {ping.success
+                      ? `${ping.response_time_ms?.toFixed(0)}ms`
+                      : ping.error_type || "Failed"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="glass-panel p-8 text-center">
+              <p className="text-gray-400 text-sm">
+                No connectivity data logged yet.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Deployment Notes Preview */}
+        {vm.deployment_notes && (
+          <div>
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+              Deployment Manifest
+            </h3>
+            <div className="glass-panel p-6 border-white/5 bg-surface-900/80">
+              <div className="text-gray-300 text-sm leading-relaxed prose prose-invert prose-sm">
+                {vm.deployment_notes.substring(0, 500)}
+                {vm.deployment_notes.length > 500 && "..."}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
 // Metrics Tab Component
-function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boolean }) {
+function MetricsTab({
+  metrics,
+  isLoading,
+}: {
+  metrics?: Metric[];
+  isLoading: boolean;
+}) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -459,7 +692,7 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
     .reverse()
     .filter((m) => m.collection_success)
     .map((metric) => ({
-      timestamp: format(new Date(metric.timestamp), 'HH:mm'),
+      timestamp: format(new Date(metric.timestamp), "HH:mm"),
       cpu: metric.cpu_usage_percent || 0,
       ram:
         metric.ram_used_mb && metric.ram_total_mb
@@ -472,7 +705,9 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
     <div className="space-y-8">
       {/* CPU Usage Chart */}
       <div>
-        <h3 className="text-lg font-semibold text-white mb-4">CPU Usage Over Time</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">
+          CPU Usage Over Time
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -480,11 +715,11 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
             <YAxis stroke="#9CA3AF" domain={[0, 100]} />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#1F2937',
-                border: '1px solid #374151',
-                borderRadius: '0.5rem',
+                backgroundColor: "#1F2937",
+                border: "1px solid #374151",
+                borderRadius: "0.5rem",
               }}
-              labelStyle={{ color: '#F3F4F6' }}
+              labelStyle={{ color: "#F3F4F6" }}
             />
             <Legend />
             <Line
@@ -501,7 +736,9 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
 
       {/* RAM Usage Chart */}
       <div>
-        <h3 className="text-lg font-semibold text-white mb-4">RAM Usage Over Time</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">
+          RAM Usage Over Time
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -509,11 +746,11 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
             <YAxis stroke="#9CA3AF" domain={[0, 100]} />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#1F2937',
-                border: '1px solid #374151',
-                borderRadius: '0.5rem',
+                backgroundColor: "#1F2937",
+                border: "1px solid #374151",
+                borderRadius: "0.5rem",
               }}
-              labelStyle={{ color: '#F3F4F6' }}
+              labelStyle={{ color: "#F3F4F6" }}
             />
             <Legend />
             <Line
@@ -530,7 +767,9 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
 
       {/* Disk Usage Chart */}
       <div>
-        <h3 className="text-lg font-semibold text-white mb-4">Disk Usage Over Time</h3>
+        <h3 className="text-lg font-semibold text-white mb-4">
+          Disk Usage Over Time
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -538,11 +777,11 @@ function MetricsTab({ metrics, isLoading }: { metrics?: Metric[]; isLoading: boo
             <YAxis stroke="#9CA3AF" domain={[0, 100]} />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#1F2937',
-                border: '1px solid #374151',
-                borderRadius: '0.5rem',
+                backgroundColor: "#1F2937",
+                border: "1px solid #374151",
+                borderRadius: "0.5rem",
               }}
-              labelStyle={{ color: '#F3F4F6' }}
+              labelStyle={{ color: "#F3F4F6" }}
             />
             <Legend />
             <Line
@@ -570,29 +809,9 @@ function PingHistoryTab({
 }) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <svg
-            className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-2"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <p className="text-gray-400 text-sm">Loading ping history...</p>
+      <div className="flex items-center justify-center py-20">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-t-2 border-brand-500 animate-spin"></div>
         </div>
       </div>
     );
@@ -600,70 +819,65 @@ function PingHistoryTab({
 
   if (!pingHistory || pingHistory.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-400">No ping history available</p>
+      <div className="glass-panel p-16 text-center">
+        <p className="text-gray-400">No connectivity history available.</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-gray-700">
-            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-300">
-              Timestamp
-            </th>
-            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-300">Status</th>
-            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-300">
-              Response Time
-            </th>
-            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-300">
-              Error Type
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {pingHistory.map((ping) => (
-            <tr
-              key={ping.id}
-              className={`border-b border-gray-700/50 ${
-                ping.success ? 'bg-green-900/10' : 'bg-red-900/10'
-              }`}
-            >
-              <td className="py-3 px-4 text-sm text-gray-300">
-                {format(new Date(ping.timestamp), 'PPpp')}
-              </td>
-              <td className="py-3 px-4">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    ping.success
-                      ? 'bg-green-900/50 text-green-200 border border-green-500/50'
-                      : 'bg-red-900/50 text-red-200 border border-red-500/50'
-                  }`}
-                >
-                  {ping.success ? 'Success' : 'Failed'}
-                </span>
-              </td>
-              <td className="py-3 px-4 text-sm text-gray-300">
-                {ping.response_time_ms !== undefined && ping.response_time_ms !== null
-                  ? `${ping.response_time_ms.toFixed(0)} ms`
-                  : 'N/A'}
-              </td>
-              <td className="py-3 px-4 text-sm text-gray-400">
-                {ping.error_type || '-'}
-              </td>
+    <div className="glass-panel overflow-hidden border-white/5 animate-fade-in">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-surface-900/80 border-b border-white/5 text-xs uppercase tracking-wider text-gray-500 font-semibold">
+              <th className="py-4 px-6">Timestamp</th>
+              <th className="py-4 px-6">Status</th>
+              <th className="py-4 px-6">Response Time</th>
+              <th className="py-4 px-6">Error Type</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {pingHistory.slice(0, 10).map((ping) => (
+              <tr
+                key={ping.id}
+                className="hover:bg-white/[0.02] transition-colors"
+              >
+                <td className="py-4 px-6 text-sm text-gray-300">
+                  {format(new Date(ping.timestamp), "PPpp")}
+                </td>
+                <td className="py-4 px-6">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                      ping.success
+                        ? "bg-brand-500/10 text-brand-400 border border-brand-500/20"
+                        : "bg-red-500/10 text-red-400 border border-red-500/20"
+                    }`}
+                  >
+                    {ping.success ? "Success" : "Failed"}
+                  </span>
+                </td>
+                <td className="py-4 px-6 text-sm font-mono text-gray-300">
+                  {ping.response_time_ms !== undefined &&
+                  ping.response_time_ms !== null
+                    ? `${ping.response_time_ms.toFixed(0)} ms`
+                    : "-"}
+                </td>
+                <td className="py-4 px-6 text-sm text-gray-500">
+                  {ping.error_type || "-"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 // Deployment Notes Tab Component
 function DeploymentNotesTab({ notes }: { notes?: string }) {
-  if (!notes || notes.trim() === '') {
+  if (!notes || notes.trim() === "") {
     return (
       <div className="text-center py-12">
         <p className="text-gray-400">No deployment notes available</p>
@@ -687,15 +901,24 @@ function DeploymentNotesTab({ notes }: { notes?: string }) {
           ),
           p: ({ ...props }) => <p className="text-gray-300 mb-4" {...props} />,
           ul: ({ ...props }) => (
-            <ul className="list-disc list-inside text-gray-300 mb-4 space-y-1" {...props} />
+            <ul
+              className="list-disc list-inside text-gray-300 mb-4 space-y-1"
+              {...props}
+            />
           ),
           ol: ({ ...props }) => (
-            <ol className="list-decimal list-inside text-gray-300 mb-4 space-y-1" {...props} />
+            <ol
+              className="list-decimal list-inside text-gray-300 mb-4 space-y-1"
+              {...props}
+            />
           ),
           li: ({ ...props }) => <li className="text-gray-300" {...props} />,
           code: (props) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { inline, ...rest } = props as { inline?: boolean; [key: string]: any };
+            const { inline, ...rest } = props as {
+              inline?: boolean;
+              [key: string]: any;
+            };
             return inline ? (
               <code
                 className="bg-gray-700 text-blue-300 px-1.5 py-0.5 rounded text-sm"
@@ -709,10 +932,16 @@ function DeploymentNotesTab({ notes }: { notes?: string }) {
             );
           },
           pre: ({ ...props }) => (
-            <pre className="bg-gray-700 rounded-lg overflow-x-auto mb-4" {...props} />
+            <pre
+              className="bg-gray-700 rounded-lg overflow-x-auto mb-4"
+              {...props}
+            />
           ),
           a: ({ ...props }) => (
-            <a className="text-blue-400 hover:text-blue-300 underline" {...props} />
+            <a
+              className="text-blue-400 hover:text-blue-300 underline"
+              {...props}
+            />
           ),
           blockquote: ({ ...props }) => (
             <blockquote
@@ -723,7 +952,9 @@ function DeploymentNotesTab({ notes }: { notes?: string }) {
           strong: ({ ...props }) => (
             <strong className="font-bold text-white" {...props} />
           ),
-          em: ({ ...props }) => <em className="italic text-gray-300" {...props} />,
+          em: ({ ...props }) => (
+            <em className="italic text-gray-300" {...props} />
+          ),
         }}
       >
         {notes}
@@ -749,12 +980,12 @@ function AlertsTab({
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<AlertConfig>({
     enabled: true,
-    webhook_url: '',
-    email_recipient: '',
+    webhook_url: "",
+    email_recipient: "",
     cooldown_minutes: 15,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
 
   const updateAlertConfig = useUpdateAlertConfig();
 
@@ -763,8 +994,8 @@ function AlertsTab({
     if (alertConfig) {
       setFormData({
         enabled: alertConfig.enabled ?? true,
-        webhook_url: alertConfig.webhook_url || '',
-        email_recipient: alertConfig.email_recipient || '',
+        webhook_url: alertConfig.webhook_url || "",
+        email_recipient: alertConfig.email_recipient || "",
         cooldown_minutes: alertConfig.cooldown_minutes ?? 15,
       });
     }
@@ -775,22 +1006,25 @@ function AlertsTab({
 
     // At least one notification method must be provided
     if (!formData.webhook_url && !formData.email_recipient) {
-      newErrors.general = 'At least one notification method (webhook or email) must be provided';
+      newErrors.general =
+        "At least one notification method (webhook or email) must be provided";
     }
 
     // Validate webhook URL if provided
     if (formData.webhook_url && !isValidWebhookURL(formData.webhook_url)) {
-      newErrors.webhook_url = 'Invalid webhook URL. Must be a valid HTTP or HTTPS URL';
+      newErrors.webhook_url =
+        "Invalid webhook URL. Must be a valid HTTP or HTTPS URL";
     }
 
     // Validate email if provided
     if (formData.email_recipient && !isValidEmail(formData.email_recipient)) {
-      newErrors.email_recipient = 'Invalid email address format';
+      newErrors.email_recipient = "Invalid email address format";
     }
 
     // Validate cooldown period
     if (!isValidCooldownPeriod(formData.cooldown_minutes || 15)) {
-      newErrors.cooldown_minutes = 'Cooldown period must be between 1 and 1440 minutes';
+      newErrors.cooldown_minutes =
+        "Cooldown period must be between 1 and 1440 minutes";
     }
 
     setErrors(newErrors);
@@ -804,12 +1038,15 @@ function AlertsTab({
 
     try {
       await updateAlertConfig.mutateAsync({ vmId, config: formData });
-      setSuccessMessage('Alert configuration saved successfully');
+      setSuccessMessage("Alert configuration saved successfully");
       setIsEditing(false);
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
       setErrors({
-        general: error instanceof Error ? error.message : 'Failed to save alert configuration',
+        general:
+          error instanceof Error
+            ? error.message
+            : "Failed to save alert configuration",
       });
     }
   };
@@ -819,8 +1056,8 @@ function AlertsTab({
     if (alertConfig) {
       setFormData({
         enabled: alertConfig.enabled ?? true,
-        webhook_url: alertConfig.webhook_url || '',
-        email_recipient: alertConfig.email_recipient || '',
+        webhook_url: alertConfig.webhook_url || "",
+        email_recipient: alertConfig.email_recipient || "",
         cooldown_minutes: alertConfig.cooldown_minutes ?? 15,
       });
     }
@@ -852,7 +1089,9 @@ function AlertsTab({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="text-gray-400 text-sm">Loading alert configuration...</p>
+          <p className="text-gray-400 text-sm">
+            Loading alert configuration...
+          </p>
         </div>
       </div>
     );
@@ -877,7 +1116,9 @@ function AlertsTab({
       {/* Alert Configuration Form */}
       <div className="bg-gray-750 rounded-lg p-6 border border-gray-700">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-semibold text-white">Alert Configuration</h3>
+          <h3 className="text-lg font-semibold text-white">
+            Alert Configuration
+          </h3>
           {!isEditing && (
             <button
               onClick={() => setIsEditing(true)}
@@ -892,7 +1133,9 @@ function AlertsTab({
           {/* Enable/Disable Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-300">Enable Alerts</label>
+              <label className="text-sm font-medium text-gray-300">
+                Enable Alerts
+              </label>
               <p className="text-xs text-gray-400 mt-1">
                 Receive notifications when this VM becomes unreachable
               </p>
@@ -905,13 +1148,13 @@ function AlertsTab({
               }}
               disabled={!isEditing}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                formData.enabled ? 'bg-blue-600' : 'bg-gray-600'
-              } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                formData.enabled ? "bg-blue-600" : "bg-gray-600"
+              } ${!isEditing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
               aria-label="Toggle alerts"
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  formData.enabled ? 'translate-x-6' : 'translate-x-1'
+                  formData.enabled ? "translate-x-6" : "translate-x-1"
                 }`}
               />
             </button>
@@ -919,23 +1162,26 @@ function AlertsTab({
 
           {/* Webhook URL */}
           <div>
-            <label htmlFor="webhook_url" className="block text-sm font-medium text-gray-300 mb-2">
+            <label
+              htmlFor="webhook_url"
+              className="block text-sm font-medium text-gray-300 mb-2"
+            >
               Webhook URL
             </label>
             <input
               type="url"
               id="webhook_url"
-              value={formData.webhook_url || ''}
+              value={formData.webhook_url || ""}
               onChange={(e) => {
                 setFormData({ ...formData, webhook_url: e.target.value });
                 if (errors.webhook_url) {
-                  setErrors({ ...errors, webhook_url: '' });
+                  setErrors({ ...errors, webhook_url: "" });
                 }
               }}
               disabled={!isEditing}
               placeholder="https://example.com/webhook"
               className={`w-full px-4 py-2 bg-gray-700 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                errors.webhook_url ? 'border-red-500' : 'border-gray-600'
+                errors.webhook_url ? "border-red-500" : "border-gray-600"
               }`}
               aria-label="Webhook URL"
             />
@@ -958,22 +1204,24 @@ function AlertsTab({
             <input
               type="email"
               id="email_recipient"
-              value={formData.email_recipient || ''}
+              value={formData.email_recipient || ""}
               onChange={(e) => {
                 setFormData({ ...formData, email_recipient: e.target.value });
                 if (errors.email_recipient) {
-                  setErrors({ ...errors, email_recipient: '' });
+                  setErrors({ ...errors, email_recipient: "" });
                 }
               }}
               disabled={!isEditing}
               placeholder="alerts@example.com"
               className={`w-full px-4 py-2 bg-gray-700 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                errors.email_recipient ? 'border-red-500' : 'border-gray-600'
+                errors.email_recipient ? "border-red-500" : "border-gray-600"
               }`}
               aria-label="Email Recipient"
             />
             {errors.email_recipient && (
-              <p className="text-red-400 text-xs mt-1">{errors.email_recipient}</p>
+              <p className="text-red-400 text-xs mt-1">
+                {errors.email_recipient}
+              </p>
             )}
             <p className="text-xs text-gray-400 mt-1">
               Optional: Email address to receive alert notifications
@@ -993,24 +1241,30 @@ function AlertsTab({
               id="cooldown_minutes"
               value={formData.cooldown_minutes || 15}
               onChange={(e) => {
-                setFormData({ ...formData, cooldown_minutes: parseInt(e.target.value, 10) });
+                setFormData({
+                  ...formData,
+                  cooldown_minutes: parseInt(e.target.value, 10),
+                });
                 if (errors.cooldown_minutes) {
-                  setErrors({ ...errors, cooldown_minutes: '' });
+                  setErrors({ ...errors, cooldown_minutes: "" });
                 }
               }}
               disabled={!isEditing}
               min="1"
               max="1440"
               className={`w-full px-4 py-2 bg-gray-700 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                errors.cooldown_minutes ? 'border-red-500' : 'border-gray-600'
+                errors.cooldown_minutes ? "border-red-500" : "border-gray-600"
               }`}
               aria-label="Cooldown Period"
             />
             {errors.cooldown_minutes && (
-              <p className="text-red-400 text-xs mt-1">{errors.cooldown_minutes}</p>
+              <p className="text-red-400 text-xs mt-1">
+                {errors.cooldown_minutes}
+              </p>
             )}
             <p className="text-xs text-gray-400 mt-1">
-              Minimum time between alerts for the same VM (1-1440 minutes, default: 15)
+              Minimum time between alerts for the same VM (1-1440 minutes,
+              default: 15)
             </p>
           </div>
 
@@ -1022,7 +1276,9 @@ function AlertsTab({
                 disabled={updateAlertConfig.isPending}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {updateAlertConfig.isPending ? 'Saving...' : 'Save Configuration'}
+                {updateAlertConfig.isPending
+                  ? "Saving..."
+                  : "Save Configuration"}
               </button>
               <button
                 onClick={handleCancel}
@@ -1067,7 +1323,9 @@ function AlertsTab({
           </div>
         ) : !alertHistory || alertHistory.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-400">No alerts have been sent for this VM</p>
+            <p className="text-gray-400">
+              No alerts have been sent for this VM
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1092,17 +1350,17 @@ function AlertsTab({
                 {alertHistory.slice(0, 50).map((alert) => (
                   <tr key={alert.id} className="border-b border-gray-700/50">
                     <td className="py-3 px-4 text-sm text-gray-300">
-                      {format(new Date(alert.sent_at), 'PPpp')}
+                      {format(new Date(alert.sent_at), "PPpp")}
                     </td>
                     <td className="py-3 px-4">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          alert.alert_type === 'VM_RECOVERED'
-                            ? 'bg-green-900/50 text-green-200 border border-green-500/50'
-                            : 'bg-yellow-900/50 text-yellow-200 border border-yellow-500/50'
+                          alert.alert_type === "VM_RECOVERED"
+                            ? "bg-green-900/50 text-green-200 border border-green-500/50"
+                            : "bg-yellow-900/50 text-yellow-200 border border-yellow-500/50"
                         }`}
                       >
-                        {alert.alert_type.replace(/_/g, ' ')}
+                        {alert.alert_type.replace(/_/g, " ")}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-300 capitalize">
@@ -1112,14 +1370,16 @@ function AlertsTab({
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           alert.success
-                            ? 'bg-green-900/50 text-green-200 border border-green-500/50'
-                            : 'bg-red-900/50 text-red-200 border border-red-500/50'
+                            ? "bg-green-900/50 text-green-200 border border-green-500/50"
+                            : "bg-red-900/50 text-red-200 border border-red-500/50"
                         }`}
                       >
-                        {alert.success ? 'Sent' : 'Failed'}
+                        {alert.success ? "Sent" : "Failed"}
                       </span>
                       {!alert.success && alert.error_message && (
-                        <p className="text-xs text-red-400 mt-1">{alert.error_message}</p>
+                        <p className="text-xs text-red-400 mt-1">
+                          {alert.error_message}
+                        </p>
                       )}
                     </td>
                   </tr>
