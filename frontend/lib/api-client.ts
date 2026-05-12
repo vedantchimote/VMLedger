@@ -137,9 +137,27 @@ const createAxiosInstance = (): AxiosInstance => {
         }
       }
 
+      // Extract backend error message so callers get a human-readable message
+      // instead of Axios's generic "Request failed with status code 400"
+      if (error.response?.data) {
+        const data = error.response.data as any;
+        const backendMessage =
+          data?.error?.message || data?.message || data?.detail;
+        if (backendMessage) {
+          const enrichedError = new Error(backendMessage);
+          (enrichedError as any).response = error.response;
+          (enrichedError as any).status = error.response.status;
+          (enrichedError as any).code = data?.error?.code;
+          return Promise.reject(enrichedError);
+        }
+      }
+
       // Handle network errors
       if (!error.response) {
         console.error("Network error:", error.message);
+        return Promise.reject(
+          new Error("Network error — please check your connection"),
+        );
       }
 
       return Promise.reject(error);
