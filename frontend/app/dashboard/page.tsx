@@ -103,7 +103,12 @@ export default function DashboardPage() {
 
     // Use search results if searching, otherwise use all VMs
     if (debouncedSearchQuery && searchResults) {
-      vms = searchResults.map((result) => result.vm);
+      // Search API returns VMs without metrics — enrich from dashboard data
+      const dashboardMap = new Map((allVms || []).map(vm => [vm.id, vm]));
+      vms = searchResults.map((result) => {
+        const dashVm = dashboardMap.get(result.vm.id);
+        return dashVm ? { ...dashVm, ...result.vm, latest_cpu: dashVm.latest_cpu, latest_ram_used: dashVm.latest_ram_used, latest_ram_total: dashVm.latest_ram_total, latest_disk_percent: dashVm.latest_disk_percent, latest_disk_used_gb: dashVm.latest_disk_used_gb, latest_disk_total_gb: dashVm.latest_disk_total_gb, latest_response_time_ms: dashVm.latest_response_time_ms } : result.vm;
+      });
     } else {
       vms = allVms || [];
     }
