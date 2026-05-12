@@ -899,78 +899,213 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {viewMode === "analytics" && (
+            {viewMode === "analytics" && (() => {
+              const onlineVms = displayVms.filter(v => v.is_reachable === true);
+              const offlineVms = displayVms.filter(v => v.is_reachable === false);
+              const vmsWithCpu = displayVms.filter(v => v.latest_cpu != null);
+              const vmsWithRam = displayVms.filter(v => v.latest_ram_used != null && v.latest_ram_total != null && v.latest_ram_total > 0);
+              const vmsWithDisk = displayVms.filter(v => v.latest_disk_percent != null);
+              const vmsWithPing = displayVms.filter(v => v.latest_response_time_ms != null);
+              const avgCpu = vmsWithCpu.length > 0 ? Math.round(vmsWithCpu.reduce((a, v) => a + (v.latest_cpu || 0), 0) / vmsWithCpu.length) : null;
+              const avgRam = vmsWithRam.length > 0 ? Math.round(vmsWithRam.reduce((a, v) => a + ((v.latest_ram_used || 0) / (v.latest_ram_total || 1)) * 100, 0) / vmsWithRam.length) : null;
+              const avgDisk = vmsWithDisk.length > 0 ? Math.round(vmsWithDisk.reduce((a, v) => a + (v.latest_disk_percent || 0), 0) / vmsWithDisk.length) : null;
+              const avgPing = vmsWithPing.length > 0 ? Math.round(vmsWithPing.reduce((a, v) => a + (v.latest_response_time_ms || 0), 0) / vmsWithPing.length * 10) / 10 : null;
+              const totalRamMB = displayVms.reduce((a, v) => a + (v.latest_ram_total || 0), 0);
+              const usedRamMB = displayVms.reduce((a, v) => a + (v.latest_ram_used || 0), 0);
+              const totalDiskGB = displayVms.reduce((a, v) => a + (v.latest_disk_total_gb || 0), 0);
+              const usedDiskGB = displayVms.reduce((a, v) => a + (v.latest_disk_used_gb || 0), 0);
+              const dnsIssues = displayVms.filter(v => v.dns_mismatch === true);
+              const uniqueTags = new Map<string, number>();
+              displayVms.forEach(v => v.tags?.forEach(t => uniqueTags.set(t, (uniqueTags.get(t) || 0) + 1)));
+              const getBarColor = (pct: number) => pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-500" : pct >= 50 ? "bg-blue-500" : "bg-emerald-500";
+
+              return (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="glass-card p-6 flex flex-col justify-center border-t-2 border-brand-500">
-                    <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2">Total Instances</h3>
-                    <div className="text-5xl font-black text-white">{displayVms.length}</div>
+                {/* Row 1: 6 summary cards */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="glass-card p-5 border-t-2 border-brand-500">
+                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total VMs</p>
+                    <p className="text-4xl font-black text-white">{displayVms.length}</p>
                   </div>
-                  <div className="glass-card p-6 flex flex-col justify-center border-t-2 border-emerald-500">
-                    <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2">Online / Offline</h3>
-                    <div className="flex items-baseline gap-3">
-                      <span className="text-5xl font-black text-emerald-400">{displayVms.filter(v => v.is_reachable === true).length}</span>
-                      <span className="text-2xl font-bold text-gray-500">/</span>
-                      <span className="text-3xl font-black text-red-400">{displayVms.filter(v => v.is_reachable === false).length}</span>
+                  <div className="glass-card p-5 border-t-2 border-emerald-500">
+                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Online</p>
+                    <p className="text-4xl font-black text-emerald-400">{onlineVms.length}<span className="text-lg text-gray-500 ml-1">/ {displayVms.length}</span></p>
+                  </div>
+                  <div className="glass-card p-5 border-t-2 border-blue-500">
+                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avg CPU</p>
+                    <p className="text-4xl font-black text-white font-mono">{avgCpu != null ? `${avgCpu}%` : "N/A"}</p>
+                  </div>
+                  <div className="glass-card p-5 border-t-2 border-violet-500">
+                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avg Memory</p>
+                    <p className="text-4xl font-black text-white font-mono">{avgRam != null ? `${avgRam}%` : "N/A"}</p>
+                  </div>
+                  <div className="glass-card p-5 border-t-2 border-amber-500">
+                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avg Disk</p>
+                    <p className="text-4xl font-black text-white font-mono">{avgDisk != null ? `${avgDisk}%` : "N/A"}</p>
+                  </div>
+                  <div className="glass-card p-5 border-t-2 border-cyan-500">
+                    <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Avg Latency</p>
+                    <p className="text-4xl font-black text-white font-mono">{avgPing != null ? `${avgPing}` : "N/A"}<span className="text-sm text-gray-500 ml-1">ms</span></p>
+                  </div>
+                </div>
+
+                {/* Row 2: Fleet resource totals */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="glass-card p-5 border border-white/5">
+                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Fleet RAM Pool</h3>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <span className="text-2xl font-black text-white font-mono">{totalRamMB >= 1024 ? `${(usedRamMB / 1024).toFixed(1)}` : usedRamMB}</span>
+                      <span className="text-sm text-gray-500">/ {totalRamMB >= 1024 ? `${(totalRamMB / 1024).toFixed(1)} GB` : `${totalRamMB} MB`} used</span>
+                    </div>
+                    <div className="w-full bg-surface-800 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${getBarColor(totalRamMB > 0 ? (usedRamMB / totalRamMB) * 100 : 0)}`} style={{ width: `${totalRamMB > 0 ? Math.min((usedRamMB / totalRamMB) * 100, 100) : 0}%` }} />
                     </div>
                   </div>
-                  <div className="glass-card p-6 flex flex-col justify-center border-t-2 border-blue-500">
-                    <h3 className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-2">Fleet Avg CPU</h3>
-                    <div className="text-5xl font-black text-white font-mono">
-                      {displayVms.filter(v => v.latest_cpu !== undefined && v.latest_cpu !== null).length > 0 
-                        ? `${Math.round(displayVms.reduce((acc, v) => acc + (v.latest_cpu || 0), 0) / displayVms.filter(v => v.latest_cpu !== undefined && v.latest_cpu !== null).length)}%` 
-                        : "N/A"}
+                  <div className="glass-card p-5 border border-white/5">
+                    <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3">Fleet Disk Pool</h3>
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <span className="text-2xl font-black text-white font-mono">{usedDiskGB.toFixed(1)}</span>
+                      <span className="text-sm text-gray-500">/ {totalDiskGB.toFixed(1)} GB used</span>
+                    </div>
+                    <div className="w-full bg-surface-800 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${getBarColor(totalDiskGB > 0 ? (usedDiskGB / totalDiskGB) * 100 : 0)}`} style={{ width: `${totalDiskGB > 0 ? Math.min((usedDiskGB / totalDiskGB) * 100, 100) : 0}%` }} />
                     </div>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="glass-card p-6 border border-white/5">
-                    <h3 className="text-[11px] font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
-                      <svg className="w-4 h-4 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                      Top CPU Consumers
+
+                {/* Row 3: Top consumers (CPU, Memory, Disk) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[
+                    { title: "Top CPU Consumers", color: "brand", icon: "M13 10V3L4 14h7v7l9-11h-7z", getVal: (v: VM) => v.latest_cpu || 0, fmt: (v: VM) => formatMetric(v.latest_cpu, "%") },
+                    { title: "Top Memory Consumers", color: "blue", icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4", getVal: (v: VM) => v.latest_ram_total && v.latest_ram_total > 0 ? ((v.latest_ram_used || 0) / v.latest_ram_total) * 100 : 0, fmt: (v: VM) => v.latest_ram_total && v.latest_ram_total > 0 ? `${Math.round(((v.latest_ram_used || 0) / v.latest_ram_total) * 100)}%` : "N/A" },
+                    { title: "Top Disk Consumers", color: "amber", icon: "M4 7v10c0 2 3.6 4 8 4s8-2 8-4V7M4 7c0 2 3.6 4 8 4s8-2 8-4M4 7c0-2 3.6-4 8-4s8 2 8 4", getVal: (v: VM) => v.latest_disk_percent || 0, fmt: (v: VM) => formatMetric(v.latest_disk_percent, "%") },
+                  ].map(panel => (
+                    <div key={panel.title} className="glass-card p-5 border border-white/5">
+                      <h3 className="text-[10px] font-bold text-white mb-5 uppercase tracking-wider flex items-center gap-2">
+                        <svg className={`w-3.5 h-3.5 text-${panel.color}-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={panel.icon} /></svg>
+                        {panel.title}
+                      </h3>
+                      <div className="space-y-3">
+                        {[...displayVms].sort((a, b) => panel.getVal(b) - panel.getVal(a)).slice(0, 5).map(vm => (
+                          <div key={vm.id} className="group">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs text-gray-300 font-semibold truncate w-32 group-hover:text-white transition-colors">{vm.hostname}</span>
+                              <span className={`text-[11px] font-mono font-bold text-${panel.color}-400`}>{panel.fmt(vm)}</span>
+                            </div>
+                            <div className="w-full bg-surface-800 rounded-full h-1 overflow-hidden">
+                              <div className={`h-full bg-${panel.color}-500 rounded-full`} style={{ width: `${Math.min(panel.getVal(vm), 100)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Row 4: Latency ranking + DNS Health + Tag Distribution */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="glass-card p-5 border border-white/5">
+                    <h3 className="text-[10px] font-bold text-white mb-5 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Ping Latency Ranking
                     </h3>
-                    <div className="space-y-4">
-                      {[...displayVms].sort((a, b) => (b.latest_cpu || 0) - (a.latest_cpu || 0)).slice(0, 5).map(vm => (
-                        <div key={vm.id} className="group relative">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm text-gray-300 font-bold truncate w-48 group-hover:text-white transition-colors">{vm.hostname}</span>
-                            <span className="text-xs font-mono font-bold text-brand-400">{formatMetric(vm.latest_cpu, "%")}</span>
-                          </div>
-                          <div className="w-full bg-surface-800 rounded-full h-1.5 overflow-hidden">
-                            <div className="h-full bg-brand-500 rounded-full" style={{ width: `${Math.min(vm.latest_cpu || 0, 100)}%` }}></div>
-                          </div>
+                    <div className="space-y-2.5">
+                      {[...displayVms].filter(v => v.latest_response_time_ms != null).sort((a, b) => (a.latest_response_time_ms || 0) - (b.latest_response_time_ms || 0)).slice(0, 5).map((vm, i) => (
+                        <div key={vm.id} className="flex items-center gap-3">
+                          <span className={`text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full ${i === 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-surface-700 text-gray-400'}`}>{i + 1}</span>
+                          <span className="text-xs text-gray-300 truncate flex-1">{vm.hostname}</span>
+                          <span className="text-[11px] font-mono font-bold text-cyan-400">{vm.latest_response_time_ms?.toFixed(1)} ms</span>
                         </div>
                       ))}
+                      {vmsWithPing.length === 0 && <p className="text-xs text-gray-500 italic">No ping data available</p>}
                     </div>
                   </div>
-                  
-                  <div className="glass-card p-6 border border-white/5">
-                    <h3 className="text-[11px] font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-2">
-                      <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
-                      Top Memory Consumers
+
+                  <div className="glass-card p-5 border border-white/5">
+                    <h3 className="text-[10px] font-bold text-white mb-5 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                      DNS Health
                     </h3>
-                    <div className="space-y-4">
-                      {[...displayVms].sort((a, b) => ((b.latest_ram_used || 0)/(b.latest_ram_total || 1)) - ((a.latest_ram_used || 0)/(a.latest_ram_total || 1))).slice(0, 5).map(vm => (
-                        <div key={vm.id} className="group relative">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm text-gray-300 font-bold truncate w-48 group-hover:text-white transition-colors">{vm.hostname}</span>
-                            <span className="text-xs font-mono font-bold text-blue-400">
-                              {vm.latest_ram_used !== undefined && vm.latest_ram_total !== undefined && vm.latest_ram_total > 0
-                                ? `${Math.round((vm.latest_ram_used / vm.latest_ram_total) * 100)}%`
-                                : "N/A"}
-                            </span>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-400">Healthy</span>
+                        <span className="text-sm font-bold text-emerald-400">{displayVms.filter(v => v.dns_mismatch === false).length}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-400">Mismatched</span>
+                        <span className={`text-sm font-bold ${dnsIssues.length > 0 ? 'text-red-400' : 'text-gray-500'}`}>{dnsIssues.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-gray-400">Unchecked</span>
+                        <span className="text-sm font-bold text-gray-500">{displayVms.filter(v => v.dns_mismatch == null).length}</span>
+                      </div>
+                      {dnsIssues.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-white/5">
+                          <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider mb-2">Mismatched Hosts</p>
+                          {dnsIssues.map(vm => (
+                            <p key={vm.id} className="text-xs text-gray-300 truncate">• {vm.hostname}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="glass-card p-5 border border-white/5">
+                    <h3 className="text-[10px] font-bold text-white mb-5 uppercase tracking-wider flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
+                      Tag Distribution
+                    </h3>
+                    <div className="space-y-2">
+                      {[...uniqueTags.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([tag, count]) => (
+                        <div key={tag} className="flex items-center gap-2">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 truncate max-w-[120px]">{tag}</span>
+                          <div className="flex-1 bg-surface-800 rounded-full h-1 overflow-hidden">
+                            <div className="h-full bg-violet-500/50 rounded-full" style={{ width: `${(count / displayVms.length) * 100}%` }} />
                           </div>
-                          <div className="w-full bg-surface-800 rounded-full h-1.5 overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(((vm.latest_ram_used || 0) / (vm.latest_ram_total || 1)) * 100, 100)}%` }}></div>
-                          </div>
+                          <span className="text-[10px] font-mono text-gray-500">{count}</span>
                         </div>
                       ))}
+                      {uniqueTags.size === 0 && <p className="text-xs text-gray-500 italic">No tags assigned</p>}
                     </div>
                   </div>
+                </div>
+
+                {/* Row 5: Per-VM resource table */}
+                <div className="glass-card p-5 border border-white/5 overflow-x-auto">
+                  <h3 className="text-[10px] font-bold text-white mb-4 uppercase tracking-wider">Per-Instance Resource Breakdown</h3>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-gray-500 text-[10px] uppercase tracking-wider border-b border-white/5">
+                        <th className="text-left py-2 pr-4">Hostname</th>
+                        <th className="text-left py-2 pr-4">IP</th>
+                        <th className="text-right py-2 pr-4">CPU</th>
+                        <th className="text-right py-2 pr-4">RAM</th>
+                        <th className="text-right py-2 pr-4">Disk</th>
+                        <th className="text-right py-2 pr-4">Ping</th>
+                        <th className="text-center py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...displayVms].sort((a, b) => a.hostname.localeCompare(b.hostname)).map(vm => {
+                        const ramPct = vm.latest_ram_total && vm.latest_ram_total > 0 ? Math.round(((vm.latest_ram_used || 0) / vm.latest_ram_total) * 100) : null;
+                        return (
+                        <tr key={vm.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                          <td className="py-2.5 pr-4 font-semibold text-gray-200">{vm.hostname}</td>
+                          <td className="py-2.5 pr-4 text-gray-400 font-mono">{vm.ip_address}</td>
+                          <td className="py-2.5 pr-4 text-right font-mono"><span className={vm.latest_cpu != null && vm.latest_cpu >= 80 ? 'text-red-400 font-bold' : 'text-gray-300'}>{vm.latest_cpu != null ? `${vm.latest_cpu.toFixed(1)}%` : '—'}</span></td>
+                          <td className="py-2.5 pr-4 text-right font-mono"><span className={ramPct != null && ramPct >= 80 ? 'text-red-400 font-bold' : 'text-gray-300'}>{ramPct != null ? `${ramPct}%` : '—'}</span></td>
+                          <td className="py-2.5 pr-4 text-right font-mono"><span className={vm.latest_disk_percent != null && vm.latest_disk_percent >= 80 ? 'text-red-400 font-bold' : 'text-gray-300'}>{vm.latest_disk_percent != null ? `${vm.latest_disk_percent.toFixed(1)}%` : '—'}</span></td>
+                          <td className="py-2.5 pr-4 text-right font-mono text-gray-300">{vm.latest_response_time_ms != null ? `${vm.latest_response_time_ms.toFixed(1)}ms` : '—'}</td>
+                          <td className="py-2.5 text-center"><span className={`inline-block w-2 h-2 rounded-full ${vm.is_reachable === true ? 'bg-emerald-400' : vm.is_reachable === false ? 'bg-red-400' : 'bg-gray-500'}`} /></td>
+                        </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
+              );
+            })()}
           </>
         )}
       </main>

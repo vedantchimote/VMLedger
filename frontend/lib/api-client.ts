@@ -401,6 +401,14 @@ export const api = {
           vm.latest_metrics?.ram_total_mb ?? vm.latest_ram_total,
         latest_disk_percent:
           vm.latest_metrics?.disk_usage_percent ?? vm.latest_disk_percent,
+        latest_disk_used_gb:
+          vm.latest_metrics?.disk_used_gb ?? vm.latest_disk_used_gb,
+        latest_disk_total_gb:
+          vm.latest_metrics?.disk_total_gb ?? vm.latest_disk_total_gb,
+        latest_response_time_ms:
+          vm.latest_ping?.response_time_ms ?? vm.latest_response_time_ms,
+        latest_metrics_timestamp:
+          vm.latest_metrics?.timestamp ?? vm.latest_metrics_timestamp,
       }));
     },
   },

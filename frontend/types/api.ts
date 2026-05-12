@@ -67,6 +67,10 @@ export interface VM {
   latest_ram_used?: number;
   latest_ram_total?: number;
   latest_disk_percent?: number;
+  latest_disk_used_gb?: number;
+  latest_disk_total_gb?: number;
+  latest_response_time_ms?: number;
+  latest_metrics_timestamp?: string;
   resolved_ip?: string;
   dns_last_checked?: string;
   dns_mismatch?: boolean;
