@@ -1,176 +1,134 @@
 # VMLedger Frontend
 
-Next.js 14 frontend application for VMLedger - a lightweight CMDB and monitoring tool for personal VM infrastructure.
+Next.js 14 dashboard for VMLedger — a lightweight CMDB and observability platform for VM infrastructure.
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 with App Router
+- **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript
-- **Styling**: TailwindCSS
-- **Data Fetching**: TanStack Query (React Query)
-- **HTTP Client**: Axios
-- **State Management**: React Query + localStorage for auth
+- **Styling**: TailwindCSS with custom design system (glass-card, surface tokens)
+- **Data Fetching**: TanStack Query (React Query) with 30s auto-refresh
+- **HTTP Client**: Axios with interceptors
+- **State Management**: React Query + localStorage for auth tokens
 
 ## Project Structure
 
 ```
 frontend/
-├── app/                    # Next.js App Router pages
-│   ├── layout.tsx         # Root layout with QueryProvider
-│   └── page.tsx           # Home page
-├── components/            # Reusable React components
-├── lib/                   # Utilities and configurations
-│   ├── api-client.ts     # Axios instance with auth interceptors
-│   ├── query-provider.tsx # React Query provider
-│   └── hooks/            # Custom React Query hooks
-│       ├── use-auth.ts   # Authentication hooks
-│       ├── use-vms.ts    # VM management hooks
-│       ├── use-monitoring.ts # Monitoring data hooks
-│       └── use-dashboard.ts  # Dashboard hooks
-├── types/                 # TypeScript type definitions
-│   └── api.ts            # API response types
-└── public/               # Static assets
-
+├── app/
+│   ├── layout.tsx              # Root layout with QueryProvider
+│   ├── page.tsx                # Home page (redirects to dashboard)
+│   ├── login/page.tsx          # Login form
+│   ├── register/page.tsx       # Registration form
+│   ├── dashboard/
+│   │   ├── page.tsx            # Dashboard (6 view modes + analytics)
+│   │   └── KanbanCard.tsx      # Kanban view card component
+│   └── vms/
+│       ├── new/page.tsx        # VM registration with credential validation
+│       └── [id]/page.tsx       # VM details (monitoring/ping/DNS/specs/alerts)
+├── lib/
+│   ├── api-client.ts           # Axios instance + token manager + error extraction
+│   ├── query-provider.tsx      # React Query provider config
+│   ├── validation.ts           # Form validation utilities
+│   └── hooks/
+│       ├── use-auth.ts         # useLogin, useLogout, useRegister, useAuth
+│       ├── use-vms.ts          # useVMs, useVM, useVMSpecs, useCreateVM, useDeleteVM
+│       ├── use-dashboard.ts    # useDashboard (auto-refresh, auth-gated)
+│       ├── use-monitoring.ts   # useVMMetrics, useVMPingHistory
+│       └── use-alerts.ts       # useAlertConfig, useAlertHistory
+├── types/
+│   └── api.ts                  # TypeScript interfaces (VM, Metric, PingResult, etc.)
+└── public/                     # Static assets
 ```
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 20.x or higher
-- npm 10.x or higher
-
-### Installation
-
-1. Install dependencies:
 ```bash
+# Install dependencies
 npm install
-```
 
-2. Configure environment variables:
-```bash
-cp .env.example .env.local
-```
+# Configure API URL (optional — defaults to http://localhost:8000)
+echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" > .env.local
 
-Edit `.env.local` and set the API base URL:
-```
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-### Development
-
-Run the development server:
-```bash
+# Start dev server
 npm run dev
+
+# Type check
+npx tsc --noEmit
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000 in your browser.
 
-### Build
+## Dashboard View Modes
 
-Build for production:
-```bash
-npm run build
-```
+The dashboard supports 6 view modes, switchable via toolbar icons:
 
-Start production server:
-```bash
-npm start
-```
+| Mode      | Description                                                   |
+|-----------|---------------------------------------------------------------|
+| Grid      | VM cards with status dot, CPU/RAM/Disk bars, tags             |
+| List      | Compact rows with inline metrics                              |
+| Table     | Sortable tabular data                                         |
+| Kanban    | Status-grouped columns (online/offline)                       |
+| Minimal   | Ultra-compact status dot grid                                 |
+| Analytics | Fleet-wide metrics: 6 KPI cards, resource pools, top consumers, DNS health, latency ranking, tag distribution, per-instance table |
 
-## Features
+## VM Detail Page Tabs
 
-### API Client
+| Tab        | Description                                                  |
+|------------|--------------------------------------------------------------|
+| Monitoring | CPU, RAM, Disk usage over time                               |
+| Ping       | Ping history with response times                             |
+| DNS        | Registered IP vs resolved IP, drift detection                |
+| Specs      | Live hardware specs (OS, CPU, RAM, partitions) fetched via SSH |
+| Alerts     | Alert configuration and history                              |
 
-The API client (`lib/api-client.ts`) provides:
-
-- **Authentication Token Management**: Automatic token storage and retrieval from localStorage
-- **Request Interceptors**: Automatically attach JWT tokens to requests
-- **Response Interceptors**: Handle 401 errors and redirect to login
-- **Token Expiry Handling**: Check token expiry before requests
-- **Error Handling**: Centralized error handling for API requests
-
-### React Query Hooks
-
-Custom hooks for data fetching with automatic caching and refetching:
-
-- `useVMs()` - Fetch all VMs
-- `useVM(id)` - Fetch single VM
-- `useCreateVM()` - Create new VM
-- `useUpdateVM()` - Update VM
-- `useDeleteVM()` - Delete VM
-- `useVMSearch(query)` - Search VMs
-- `useVMMetrics(vmId)` - Fetch VM metrics
-- `useVMPingHistory(vmId)` - Fetch ping history
-- `useDashboard()` - Fetch dashboard summary (auto-refresh every 30s)
+## React Query Hooks
 
 ### Authentication
+- `useLogin()` — Login mutation, stores JWT + redirects to dashboard
+- `useRegister()` — Register mutation with auto-login
+- `useLogout()` — Logout mutation, clears token + redirects to login
+- `useAuth()` — Auth state (isAuthenticated, isMounted, token)
 
-Authentication is handled via JWT tokens stored in localStorage:
+### VM Management
+- `useVMs()` — Fetch all VMs for current user
+- `useVM(id)` — Fetch single VM details
+- `useVMSpecs(id)` — Fetch live hardware specs (5-min stale time)
+- `useVMSearch(query)` — Full-text search across VMs
+- `useCreateVM()` — Register new VM
+- `useUpdateVM()` — Update VM fields
+- `useDeleteVM()` — Delete VM and all associated data
 
-- `tokenManager.getToken()` - Get current token
-- `tokenManager.setToken(token, expiresAt)` - Store token
-- `tokenManager.removeToken()` - Clear token
-- `tokenManager.isAuthenticated()` - Check if user is authenticated
-- `tokenManager.isTokenExpired()` - Check if token is expired
+### Monitoring
+- `useVMMetrics(vmId, limit)` — Historical CPU/RAM/Disk metrics
+- `useVMPingHistory(vmId, limit)` — Historical ping results
+- `useDashboard()` — Aggregated dashboard data (30s auto-refresh, auth-gated)
 
-## Configuration
+### Alerts
+- `useAlertConfig(vmId)` — Get alert webhook configuration
+- `useUpdateAlertConfig()` — Update alert settings
+- `useAlertHistory(vmId)` — Get alert event history
 
-### React Query
+## API Client Features
 
-Default configuration in `lib/query-provider.tsx`:
+The Axios client (`lib/api-client.ts`) handles:
 
-- **Stale Time**: 30 seconds (dashboard auto-refresh interval)
-- **Cache Time**: 5 minutes
-- **Retry**: 3 attempts with exponential backoff
-- **Refetch on Window Focus**: Enabled
-- **Refetch on Reconnect**: Enabled
+- **Token injection**: Automatically attaches `Bearer` token to all requests
+- **Token expiry check**: Falls back to JWT `exp` claim when localStorage expiry is missing
+- **Backend error extraction**: Parses `error.message` from API responses instead of showing raw HTTP status codes
+- **Auth redirect**: On 401, removes token and redirects to `/login` (skipped on login/register pages)
+- **Network errors**: Shows user-friendly "Network error" message
 
-### API Client
+## Token Management
 
-Configuration in `lib/api-client.ts`:
-
-- **Base URL**: Configurable via `NEXT_PUBLIC_API_BASE_URL`
-- **Timeout**: 30 seconds
-- **Auto Token Attachment**: Enabled
-- **401 Redirect**: Automatic redirect to `/login`
-
-## TypeScript Types
-
-All API types are defined in `types/api.ts`:
-
-- `ApiResponse<T>` - Standard API response wrapper
-- `User` - User model
-- `VM` - Virtual machine model
-- `Metric` - Resource metric model
-- `PingResult` - Ping check result
-- `Alert` - Alert notification
-- `AlertConfig` - Alert configuration
-
-## Next Steps
-
-The following pages need to be implemented:
-
-1. **Authentication Pages** (Task 17.2)
-   - `/login` - Login page
-   - `/register` - Registration page
-
-2. **Dashboard** (Task 17.4)
-   - `/dashboard` - Main dashboard with VM list
-
-3. **VM Management** (Task 17.3)
-   - `/vms/new` - VM registration form
-   - `/vms/[id]/edit` - VM edit form
-
-4. **VM Details** (Task 17.5)
-   - `/vms/[id]` - VM details with metrics and history
-
-5. **Search** (Task 17.7)
-   - `/search` - Search interface
-
-6. **Alert Configuration** (Task 17.8)
-   - `/vms/[id]/alerts` - Alert configuration page
+```typescript
+tokenManager.getToken()         // Get JWT from localStorage
+tokenManager.setToken(t, exp)   // Store JWT + expiry
+tokenManager.removeToken()      // Clear auth state
+tokenManager.isAuthenticated()  // Token exists and not expired
+tokenManager.isTokenExpired()   // Check expiry (falls back to JWT decode)
+```
 
 ## License
 
-This project is part of the VMLedger system.
+Part of the VMLedger system — MIT License.

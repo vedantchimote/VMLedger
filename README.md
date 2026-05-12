@@ -2,129 +2,119 @@
 
 <div align="center">
 
-![VMLedger Logo](https://via.placeholder.com/200x200?text=VMLedger)
+**Lightweight CMDB & Observability Platform for VM Infrastructure**
 
-**Your Virtual Machine Management Platform**
-
-[![Documentation](https://img.shields.io/badge/docs-mintlify-blue)](http://localhost:3001)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D)](https://redis.io/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Architecture](#-architecture) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Architecture](#-architecture) • [API Reference](#-api-reference) • [Dashboard](#-dashboard)
 
 </div>
 
 ---
 
-## 📋 Table of Contents
+## Overview
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-- [Documentation](#-documentation)
-- [Architecture](#-architecture)
-- [Technology Stack](#-technology-stack)
-- [Project Status](#-project-status)
-- [What We've Built](#-what-weve-built)
-- [Future Roadmap](#-future-roadmap)
-- [Contributing](#-contributing)
-- [License](#-license)
-
-## 🎯 Overview
-
-VMLedger is a comprehensive virtual machine management platform designed to help infrastructure teams monitor, manage, and track their VM deployments across multiple environments.
-
-### Why VMLedger?
-
-- **Centralized Management**: All your VMs in one place
-- **Automated Monitoring**: Health checks every 60 seconds
-- **Smart Alerting**: Get notified when things go wrong
-- **Deployment Tracking**: Keep a history of all changes
-- **Powerful Search**: Find VMs instantly with tags and filters
-- **Secure by Design**: Encrypted credentials, JWT authentication, rate limiting
+VMLedger is an agentless monitoring and configuration management database (CMDB) for personal and team VM infrastructure. It connects to your VMs via SSH to collect real-time metrics, performs health checks, detects DNS drift, and provides a rich dashboard for fleet-wide observability — all without installing agents on your VMs.
 
 ## ✨ Features
 
-### 🖥️ Virtual Machine Management
-- Add and manage VMs with IP addresses, SSH credentials, and metadata
-- Secure credential storage with AES-256 encryption
+### VM Registry & Lifecycle
+- Register VMs with IP, hostname, domain, SSH port, and tags
+- SSH credential validation on registration (password or key)
+- AES-256 encrypted credential storage with per-user key derivation
+- Bulk select and delete VMs from dashboard
 - Tag-based organization and filtering
-- Bulk operations support
 
-### 📊 Real-Time Monitoring
-- Automated ping checks every 60 seconds
-- System metrics collection (CPU, memory, disk, network) every 5 minutes
-- Historical data tracking and visualization
-- Customizable monitoring intervals
+### Real-Time Monitoring
+- Automated ICMP + TCP ping checks every 60 seconds
+- SSH-based system metrics collection (CPU, RAM, Disk) every 5 minutes
+- On-demand triggers: Ping, DNS Check, and Metrics Collection via UI buttons
+- Historical data retention (last 1000 data points per VM)
 
-### 🔔 Intelligent Alerting
-- Webhook-based notifications (Slack, Discord, custom endpoints)
+### Live VM Specs
+- One-click hardware spec fetch via SSH (`lscpu`, `free`, `df`, `/etc/os-release`)
+- Displays: OS name, kernel version, CPU model & cores, total RAM, storage partitions
+- Dedicated Specs tab on each VM's detail page
+
+### DNS Drift Detection
+- Periodic forward DNS resolution of VM hostnames
+- Compares resolved IP vs registered IP to detect DNS mismatches
+- DNS health summary in analytics dashboard
+
+### Fleet Analytics Dashboard
+- **6 KPI summary cards**: Total VMs, Online count, Avg CPU / Memory / Disk / Latency
+- **Fleet resource pools**: Aggregate RAM and Disk usage with progress bars
+- **Top consumers**: Ranked CPU, Memory, and Disk usage per VM
+- **Ping latency ranking**: Fastest to slowest response times
+- **DNS health panel**: Healthy / Mismatched / Unchecked breakdown
+- **Tag distribution**: Visual breakdown of tag usage across fleet
+- **Per-instance table**: Full resource breakdown with threshold highlighting (≥80% = red)
+
+### Multi-View Dashboard
+- **Grid view**: VM cards with status indicator, metrics bars, and tags
+- **List view**: Compact row-based layout
+- **Table view**: Sortable tabular data
+- **Kanban view**: Status-grouped columns
+- **Minimal view**: Ultra-compact status dots
+- **Analytics view**: Full fleet-wide metrics dashboard
+
+### Alerting System
+- Webhook notifications (Slack, Discord, custom endpoints)
 - Configurable cooldown periods (default: 15 minutes)
 - Alert history and acknowledgment tracking
-- Multiple alert channels per VM
+- Per-VM alert configuration
 
-### 🚀 Deployment Management
-- Track deployments with timestamps and notes
-- Link deployments to specific VMs
-- Deployment history and rollback tracking
-- Support for up to 50,000 characters in deployment notes
-
-### 🔍 Advanced Search
-- Full-text search across VMs, deployments, and alerts
-- Filter by tags, status, and date ranges
-- Fast search with Redis caching
-- Fuzzy matching support
-
-### 🔐 Security First
-- JWT-based authentication with 24-hour sessions
+### Security
+- JWT authentication with 24-hour sessions
 - Bcrypt password hashing (cost factor 12)
-- Rate limiting (5 attempts per 15 minutes)
-- Account lockout protection (30 minutes after 5 failed attempts)
-- Encrypted credential storage
-- Comprehensive audit logging
+- Rate limiting: 5 failed login attempts per 15 minutes
+- Account lockout: 30-minute lockout after 5 failures
+- CORS protection with configurable origins
+- Backend error messages surfaced to UI (no raw HTTP status codes)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Docker 20.10+
-- Docker Compose 2.0+
+- Docker 20.10+ & Docker Compose 2.0+
 - Node.js 18+ (for frontend)
-- Git
 
-### Installation
+### Start Backend (Docker)
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/vmledger.git
-cd vmledger
+git clone https://github.com/vedantchimote/VMLedger.git
+cd VMLedger
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
-
-# Start backend services
+# Start PostgreSQL, Redis, FastAPI, Celery worker & beat
 docker-compose up -d
 
 # Run database migrations
 docker-compose exec api alembic upgrade head
+```
 
-# Start frontend
+### Start Frontend
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### Access the Application
+### Access
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Documentation**: http://localhost:3001
+| Service        | URL                          |
+|----------------|------------------------------|
+| Frontend       | http://localhost:3000         |
+| Backend API    | http://localhost:8000         |
+| Swagger Docs   | http://localhost:8000/api/docs |
+| ReDoc          | http://localhost:8000/api/redoc |
 
-### Create Your First User
+### Register & Login
 
 ```bash
 curl -X POST http://localhost:8000/api/auth/register \
@@ -132,534 +122,190 @@ curl -X POST http://localhost:8000/api/auth/register \
   -d '{
     "username": "admin",
     "email": "admin@example.com",
-    "password": "SecurePass123!"
+    "password": "SecurePass123!@"
   }'
-```
-
-## 📚 Documentation
-
-Comprehensive documentation is available at **http://localhost:3001** (when running locally).
-
-### Documentation Highlights
-
-- ✅ **Beginner-Friendly**: No assumptions about prior knowledge
-- ✅ **Visual Learning**: 25+ Mermaid diagrams
-- ✅ **Practical Examples**: 50+ code examples
-- ✅ **Step-by-Step Guides**: Clear instructions
-- ✅ **Troubleshooting**: Common issues with solutions
-
-### Key Documentation Pages
-
-- [Introduction](http://localhost:3001/introduction) - Overview and features
-- [Quick Start](http://localhost:3001/quickstart) - 5-minute setup
-- [Installation](http://localhost:3001/installation) - Detailed installation
-- [Core Concepts](http://localhost:3001/concepts/overview) - Fundamental concepts
-- [API Reference](http://localhost:3001/api-reference/introduction) - Complete API docs
-- [Architecture](http://localhost:3001/architecture/overview) - System architecture
-
-### Starting Documentation Server
-
-```bash
-cd docs
-mintlify dev
 ```
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        UI[Next.js Frontend<br/>Port 3000]
-    end
-    
-    subgraph "API Layer"
-        API[FastAPI Backend<br/>Port 8000]
-    end
-    
-    subgraph "Task Queue"
-        CELERY[Celery Workers]
-        BEAT[Celery Beat Scheduler]
-    end
-    
-    subgraph "Data Layer"
-        PG[(PostgreSQL<br/>Port 5432)]
-        REDIS[(Redis<br/>Port 6379)]
-    end
-    
-    subgraph "External Systems"
-        VMS[Virtual Machines]
-        WEBHOOKS[Webhook Endpoints]
-    end
-    
-    UI -->|HTTP/REST| API
-    API -->|Read/Write| PG
-    API -->|Cache/Queue| REDIS
-    CELERY -->|Consume Tasks| REDIS
-    CELERY -->|SSH| VMS
-    CELERY -->|HTTP POST| WEBHOOKS
-    BEAT -->|Schedule Tasks| REDIS
+```
+┌─────────────────┐     ┌─────────────────┐     ┌──────────────┐
+│   Next.js 14    │────▶│   FastAPI        │────▶│ PostgreSQL   │
+│   Frontend      │     │   Backend        │     │ (Data Store) │
+│   :3000         │     │   :8000          │     │ :5432        │
+└─────────────────┘     └────────┬─────────┘     └──────────────┘
+                                 │
+                        ┌────────┴─────────┐
+                        │                  │
+                   ┌────▼────┐      ┌──────▼──────┐
+                   │  Redis  │      │   Celery     │
+                   │  Cache  │◀────▶│   Workers    │
+                   │  :6379  │      │   + Beat     │
+                   └─────────┘      └──────┬───────┘
+                                           │ SSH
+                                    ┌──────▼───────┐
+                                    │  Your VMs    │
+                                    │  (Agentless) │
+                                    └──────────────┘
 ```
 
-### Core Components
-
-- **Frontend**: Next.js 14 with App Router, React 18, TailwindCSS
-- **Backend**: FastAPI (Python 3.11+), SQLAlchemy 2.0, Pydantic v2
-- **Task Queue**: Celery 5.3+ with Redis broker
-- **Database**: PostgreSQL 15 with Alembic migrations
-- **Cache**: Redis 7 for caching and message brokering
-
-## 🛠️ Technology Stack
-
-### Backend
-- **Framework**: FastAPI 0.109
-- **ORM**: SQLAlchemy 2.0
-- **Task Queue**: Celery 5.3
-- **Authentication**: JWT with python-jose
-- **Password Hashing**: Bcrypt 3.2.2
-- **SSH**: Paramiko 3.4
-- **Database**: PostgreSQL 15
-- **Cache**: Redis 7
-
-### Frontend
-- **Framework**: Next.js 14
-- **UI Library**: React 18
-- **Styling**: TailwindCSS
-- **State Management**: React Query (TanStack Query)
-- **API Client**: Axios
-- **Validation**: Custom validation library
-
-### Infrastructure
-- **Containerization**: Docker & Docker Compose
-- **Reverse Proxy**: Nginx (production)
-- **Monitoring**: Celery Beat for scheduled tasks
-- **Documentation**: Mintlify
-
-## 📊 Project Status
-
-### Current Status: 🟢 Production Ready
-
-### Implementation Progress
-
-#### ✅ Completed (100%)
-
-**Core Features** (36/36 required tasks)
-- ✅ User authentication and authorization
-- ✅ Virtual machine management (CRUD)
-- ✅ SSH credential encryption
-- ✅ Health monitoring (ping checks)
-- ✅ System metrics collection
-- ✅ Alert system with webhooks
-- ✅ Deployment tracking
-- ✅ Search engine with Redis caching
-- ✅ Tag-based organization
-- ✅ Rate limiting and account lockout
-- ✅ Comprehensive API documentation
-- ✅ Frontend dashboard
-- ✅ Docker deployment
-
-**Documentation** (10/50+ pages)
-- ✅ Introduction and overview
-- ✅ Quick start guide
-- ✅ Installation guide
-- ✅ Configuration reference
-- ✅ Core concepts (overview, VMs, monitoring)
-- ✅ Architecture overview
-- ✅ API introduction
-- ✅ Password fix guide
-- 📋 Feature guides (in progress)
-- 📋 API reference pages (in progress)
-
-#### 🚧 Optional (Not Implemented)
-
-**Testing** (12 optional tasks)
-- Property-based tests for all services
-- Unit tests for additional components
-- Integration tests
-- End-to-end tests
-
-**Future Enhancements**
-- WebSocket support for real-time updates
-- Multi-tenancy (organization-based isolation)
-- Kubernetes deployment
-- Grafana integration
-- Video tutorials
-- Interactive API playground
-
-## 🎯 What We've Built
-
-### Backend Implementation
-
-1. **Authentication Service** (`vmledger/services/auth_service.py`)
-   - User registration with password complexity validation
-   - Login with JWT token generation
-   - Rate limiting (5 attempts per 15 minutes)
-   - Account lockout (30 minutes after 5 failed attempts)
-   - Token refresh and logout
-   - Bcrypt password hashing (cost factor 12)
-
-2. **VM Service** (`vmledger/services/vm_service.py`)
-   - CRUD operations for virtual machines
-   - SSH credential encryption (AES-256)
-   - Tag management
-   - Bulk operations
-
-3. **Monitoring Service** (`vmledger/services/monitoring_service.py`)
-   - Ping health checks (every 60 seconds)
-   - System metrics collection (every 5 minutes)
-   - Historical data storage
-   - Alert triggering
-
-4. **Alert Service** (`vmledger/services/alert_service.py`)
-   - Webhook notifications
-   - Cooldown period management (15 minutes)
-   - Alert history tracking
-   - Multiple channels per VM
-
-5. **Deployment Service** (`vmledger/services/deployment_service.py`)
-   - Deployment tracking
-   - Historical records
-   - Notes support (up to 50,000 characters)
-
-6. **Search Engine Service** (`vmledger/services/search_engine_service.py`)
-   - Full-text search
-   - Redis caching
-   - Tag filtering
-   - Fuzzy matching
-
-### Frontend Implementation
-
-1. **Dashboard** (`frontend/app/dashboard/page.tsx`)
-   - VM list with status indicators
-   - Health overview
-   - Recent alerts
-   - Quick actions
-
-2. **VM Management** (`frontend/app/vms/`)
-   - Add/edit/delete VMs
-   - View VM details
-   - Metrics visualization
-   - Deployment history
-
-3. **Authentication** (`frontend/app/login/`, `frontend/app/register/`)
-   - Login form with validation
-   - Registration with password strength indicator
-   - JWT token management
-
-4. **API Client** (`frontend/lib/api-client.ts`)
-   - Axios-based HTTP client
-   - Automatic token injection
-   - Error handling
-   - Response transformation
-
-### Database Schema
-
-- `users` - User accounts
-- `virtual_machines` - VM inventory
-- `vm_credentials` - Encrypted SSH credentials
-- `monitoring_data` - Health check results
-- `vm_metrics` - System metrics
-- `deployments` - Deployment history
-- `alerts` - Alert configurations
-- `alert_history` - Alert events
-
-### Deployment
-
-- **Docker Compose**: Development and production configurations
-- **Environment Variables**: Comprehensive configuration
-- **Database Migrations**: Alembic for schema management
-- **Celery Workers**: Background task processing
-- **Celery Beat**: Scheduled monitoring tasks
-
-### Documentation
-
-- **Mintlify**: Modern documentation platform
-- **25+ Mermaid Diagrams**: Visual learning aids
-- **50+ Code Examples**: Practical examples
-- **10 Comprehensive Pages**: Getting started to advanced topics
-- **Beginner-Friendly**: No jargon, clear explanations
-
-## 🗺️ Future Roadmap
-
-### Phase 1: Documentation Completion (1 month)
-- [ ] Complete all API reference pages
-- [ ] Add feature guides
-- [ ] Create video tutorials
-- [ ] Add interactive examples
-
-### Phase 2: Testing & Quality (2 months)
-- [ ] Property-based tests
-- [ ] Integration tests
-- [ ] End-to-end tests
-- [ ] Performance benchmarks
-
-### Phase 3: Advanced Features (3 months)
-- [ ] WebSocket support for real-time updates
-- [ ] Multi-tenancy (organizations)
-- [ ] Advanced metrics (custom queries)
-- [ ] Grafana integration
-
-### Phase 4: Enterprise Features (6 months)
-- [ ] RBAC (Role-Based Access Control)
-- [ ] SSO integration (SAML, OAuth)
-- [ ] Audit logging
-- [ ] Compliance reports (SOC2, GDPR)
-
-### Phase 5: Scalability (9 months)
-- [ ] Kubernetes deployment
-- [ ] High availability setup
-- [ ] Multi-region support
-- [ ] Horizontal scaling
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/vmledger.git
-cd vmledger
-
-# Set up backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Set up frontend
-cd frontend
-npm install
-
-# Run tests
-pytest
-npm test
-```
-
-### Code Style
-
-- **Python**: PEP 8, type hints, docstrings
-- **JavaScript/TypeScript**: ESLint, Prettier
-- **Commits**: Conventional Commits
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- Frontend powered by [Next.js](https://nextjs.org/)
-- Documentation by [Mintlify](https://mintlify.com/)
-- Icons from [Font Awesome](https://fontawesome.com/)
-
-## 📞 Support
-
-- **Documentation**: http://localhost:3001
-- **GitHub Issues**: https://github.com/yourusername/vmledger/issues
-- **Email**: support@vmledger.com
-- **Community Slack**: https://vmledger.slack.com
-
----
-
-<div align="center">
-
-**Made with ❤️ by the VMLedger Team**
-
-[⬆ Back to Top](#vmledger)
-
-</div>
-
-Lightweight CMDB and Monitoring System for Personal VM Infrastructure
-
-## Overview
-
-VMLedger is an agentless monitoring and configuration management database (CMDB) designed for personal VM infrastructure. It provides:
-
-- **VM Registry**: Track VMs with metadata, tags, and deployment notes
-- **Health Monitoring**: Automated ping checks and SSH-based metric collection
-- **Alerting**: Webhook and email notifications for VM failures
-- **Search**: Full-text search across VM metadata and deployment notes
-- **Security**: AES-256 encryption for credentials, user isolation, bcrypt password hashing
-
-## Architecture
-
-- **Backend**: FastAPI (Python 3.11+)
-- **Database**: PostgreSQL 15+
-- **Task Queue**: Celery with Redis
-- **Frontend**: Next.js 14 (to be implemented)
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.11 or higher
-- PostgreSQL 15 or higher
-- Redis 7 or higher
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd VMLedger
-```
-
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Configure environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-5. Initialize database:
-```bash
-# Run migrations
-alembic upgrade head
-```
-
-### Running the Application
-
-1. Start the FastAPI server:
-```bash
-uvicorn vmledger.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-2. Start Celery worker:
-```bash
-celery -A vmledger.celery_app worker --loglevel=info --concurrency=10
-```
-
-3. Start Celery Beat scheduler:
-```bash
-celery -A vmledger.celery_app beat --loglevel=info
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=vmledger --cov-report=html
-
-# Run specific test types
-pytest tests/unit/
-pytest tests/properties/
-pytest tests/integration/
-```
-
-## API Documentation
-
-Once the server is running, visit:
-- Swagger UI: http://localhost:8000/api/docs
-- ReDoc: http://localhost:8000/api/redoc
-
-## Database Migrations
-
-VMLedger uses Alembic for database schema management. See `alembic/README.md` for detailed documentation.
-
-### Common Migration Commands
-
-```bash
-# Apply all pending migrations
-alembic upgrade head
-
-# Rollback one migration
-alembic downgrade -1
-
-# Check current database version
-alembic current
-
-# View migration history
-alembic history
-
-# Create new migration (after modifying models)
-alembic revision --autogenerate -m "Description of changes"
-```
-
-### Initial Migration
-
-The initial migration creates:
-- All database tables (users, vms, credentials, ping_results, metrics, alerts, alert_configs)
-- Indexes including GIN indexes for full-text search and array fields
-- Trigger for automatic tsvector updates on the VMs table for full-text search
-
-## Configuration
-
-All configuration is managed through environment variables. See `.env.example` for available options.
-
-Key settings:
-- `SECRET_KEY`: JWT signing key (required)
-- `ENCRYPTION_MASTER_KEY`: Credential encryption key (required)
-- `DATABASE_URL`: PostgreSQL connection string
-- `REDIS_URL`: Redis connection string
-- `PING_INTERVAL_SECONDS`: Health check interval (default: 60)
-- `METRICS_INTERVAL_SECONDS`: Metric collection interval (default: 300)
-
-## Project Structure
+### Component Breakdown
+
+| Layer      | Technology                        | Purpose                                    |
+|------------|-----------------------------------|--------------------------------------------|
+| Frontend   | Next.js 14, React 18, TanStack Query | Dashboard UI, VM management, analytics   |
+| API        | FastAPI, SQLAlchemy 2.0, Pydantic v2 | REST API, auth middleware, CORS          |
+| Workers    | Celery 5.3, Redis broker          | Ping checks, metrics collection, DNS checks |
+| Scheduler  | Celery Beat                       | Periodic task scheduling (60s/300s intervals) |
+| Database   | PostgreSQL 15, Alembic            | Persistent storage, full-text search       |
+| Cache      | Redis 7                           | Dashboard caching (30s TTL), task broker   |
+| SSH        | Paramiko 3.4                      | Agentless metric collection from VMs       |
+
+## 📡 API Reference
+
+### Authentication
+| Method | Endpoint             | Description          |
+|--------|----------------------|----------------------|
+| POST   | `/api/auth/register` | Register new user    |
+| POST   | `/api/auth/login`    | Login, get JWT token |
+| POST   | `/api/auth/logout`   | Invalidate token     |
+| POST   | `/api/auth/refresh`  | Refresh JWT token    |
+
+### VM Management
+| Method | Endpoint                              | Description                      |
+|--------|---------------------------------------|----------------------------------|
+| GET    | `/api/vms`                            | List all VMs (paginated)         |
+| POST   | `/api/vms`                            | Register new VM                  |
+| GET    | `/api/vms/{id}`                       | Get VM details                   |
+| PUT    | `/api/vms/{id}`                       | Update VM                        |
+| DELETE | `/api/vms/{id}`                       | Delete VM and all associated data |
+| GET    | `/api/vms/{id}/specs`                 | Fetch live hardware specs via SSH |
+
+### Monitoring
+| Method | Endpoint                              | Description                      |
+|--------|---------------------------------------|----------------------------------|
+| GET    | `/api/vms/{id}/metrics`               | Get historical metrics           |
+| GET    | `/api/vms/{id}/ping`                  | Get ping history                 |
+| GET    | `/api/vms/{id}/status`                | Get current VM status            |
+| POST   | `/api/vms/{id}/trigger/ping`          | Trigger on-demand ping           |
+| POST   | `/api/vms/{id}/trigger/dns-check`     | Trigger on-demand DNS check      |
+| POST   | `/api/vms/{id}/trigger/collect-metrics` | Trigger on-demand metric collection |
+
+### Alerts
+| Method | Endpoint                              | Description                      |
+|--------|---------------------------------------|----------------------------------|
+| GET    | `/api/vms/{id}/alerts/config`         | Get alert configuration          |
+| PUT    | `/api/vms/{id}/alerts/config`         | Update alert configuration       |
+| GET    | `/api/vms/{id}/alerts/history`        | Get alert history                |
+
+### Dashboard & Search
+| Method | Endpoint          | Description                              |
+|--------|-------------------|------------------------------------------|
+| GET    | `/api/dashboard`  | Aggregated dashboard with all VMs + metrics |
+| GET    | `/api/search`     | Full-text search across VMs              |
+
+## 🖥️ Dashboard
+
+The dashboard provides 6 view modes for different use cases:
+
+- **Grid**: Visual VM cards with health bars and status badges
+- **List**: Compact rows for large fleets
+- **Table**: Sortable columns for data comparison
+- **Kanban**: Drag-style columns grouped by status
+- **Minimal**: Dot-grid for quick status scanning
+- **Analytics**: Full fleet metrics with resource pools, leaderboards, DNS health, and per-instance table
+
+### VM Detail Page Tabs
+
+| Tab        | Content                                                   |
+|------------|-----------------------------------------------------------|
+| Monitoring | CPU, RAM, Disk metrics charts with historical trends      |
+| Ping       | Ping history with response times and success/failure      |
+| DNS        | Registered IP vs resolved IP, mismatch detection          |
+| Specs      | Live OS, CPU, RAM, storage partition data fetched via SSH  |
+| Alerts     | Alert configuration and history for the VM                |
+
+## 📁 Project Structure
 
 ```
 VMLedger/
-├── alembic/              # Database migrations
-│   ├── versions/        # Migration scripts
-│   └── env.py           # Alembic environment config
-├── vmledger/              # Main application package
-│   ├── api/              # FastAPI route handlers
-│   ├── models/           # SQLAlchemy database models
-│   ├── schemas/          # Pydantic validation schemas
-│   ├── services/         # Business logic services
-│   ├── tasks/            # Celery background tasks
-│   ├── config.py         # Configuration management
-│   ├── database.py       # Database connection setup
-│   ├── logging_config.py # Logging configuration
-│   ├── celery_app.py     # Celery application
-│   └── main.py           # FastAPI application
-├── tests/                # Test suite
-│   ├── unit/            # Unit tests
-│   ├── properties/      # Property-based tests
-│   └── integration/     # Integration tests
-├── alembic.ini          # Alembic configuration
-├── requirements.txt      # Python dependencies
-├── .env.example         # Example environment configuration
-└── README.md            # This file
+├── vmledger/                    # Backend application
+│   ├── api/
+│   │   ├── auth.py             # Auth endpoints (register/login/logout/refresh)
+│   │   └── vms.py              # VM CRUD, dashboard, triggers, specs, alerts
+│   ├── middleware/
+│   │   ├── auth.py             # JWT validation middleware
+│   │   └── rate_limit.py       # Rate limiting middleware
+│   ├── models/                 # SQLAlchemy models (user, vm, credential, metric, etc.)
+│   ├── schemas/                # Pydantic validation schemas
+│   ├── services/
+│   │   ├── auth_service.py     # Authentication & JWT management
+│   │   ├── vm_registry_service.py  # VM CRUD + delete with cascade
+│   │   ├── metric_collector_service.py  # SSH metrics + VM specs fetch
+│   │   ├── credential_manager.py  # AES-256 encrypt/decrypt
+│   │   ├── search_engine_service.py  # Full-text search with Redis cache
+│   │   └── data_cleanup_service.py   # Historical data retention
+│   ├── tasks/                  # Celery tasks (ping, metrics, DNS)
+│   ├── main.py                 # FastAPI app + router registration
+│   ├── config.py               # Settings from environment
+│   └── database.py             # SQLAlchemy engine + session
+├── frontend/                   # Next.js 14 frontend
+│   ├── app/
+│   │   ├── dashboard/          # Main dashboard with 6 view modes
+│   │   │   ├── page.tsx        # Dashboard page (grid/list/table/kanban/minimal/analytics)
+│   │   │   └── KanbanCard.tsx  # Draggable kanban card component
+│   │   ├── vms/
+│   │   │   ├── new/page.tsx    # VM registration form with credential validation
+│   │   │   └── [id]/page.tsx   # VM detail page (monitoring/ping/DNS/specs/alerts)
+│   │   ├── login/page.tsx      # Login page
+│   │   └── register/page.tsx   # Registration page
+│   ├── lib/
+│   │   ├── api-client.ts       # Axios client with token injection + error extraction
+│   │   └── hooks/              # React Query hooks (useVMs, useDashboard, useAuth, etc.)
+│   └── types/api.ts            # TypeScript interfaces
+├── alembic/                    # Database migrations
+├── docker-compose.yml          # Full stack: postgres, redis, api, celery worker, beat
+├── Dockerfile                  # Backend container image
+└── requirements.txt            # Python dependencies
 ```
 
-## Development Status
+## ⚙️ Configuration
 
-This project is currently under active development. The following tasks are complete:
+All configuration via environment variables (see `docker-compose.yml` or `.env`):
 
-- [x] Task 1: Project structure and core infrastructure
-- [x] Task 2.1: Create SQLAlchemy models for all tables
-- [x] Task 2.4: Create Alembic migration scripts
-- [ ] Task 2.2-2.3: Property tests for validation
-- [ ] Task 3: Credential encryption and management
-- [ ] Task 4: Authentication and user management
-- [ ] Task 5+: Additional features (see tasks.md)
+| Variable                  | Default   | Description                     |
+|---------------------------|-----------|---------------------------------|
+| `DATABASE_URL`            | required  | PostgreSQL connection string    |
+| `REDIS_URL`               | required  | Redis connection string         |
+| `SECRET_KEY`              | required  | JWT signing key                 |
+| `ENCRYPTION_MASTER_KEY`   | required  | AES credential encryption key   |
+| `PING_INTERVAL_SECONDS`   | 60        | Health check frequency          |
+| `METRICS_INTERVAL_SECONDS`| 300       | Metric collection frequency     |
+| `ALERT_COOLDOWN_MINUTES`  | 15        | Alert cooldown period           |
+| `CONCURRENT_WORKERS`      | 10        | Max parallel SSH connections    |
+| `JWT_EXPIRATION_HOURS`    | 24        | Token lifetime                  |
+| `CORS_ORIGINS`            | localhost | Allowed frontend origins        |
 
-## Security
+## 🧪 Development
 
-- All SSH credentials are encrypted with AES-256-GCM before storage
-- Passwords are hashed with bcrypt (cost factor 12)
-- JWT tokens for session management (24-hour expiry)
-- User isolation enforced at database and application layers
-- Sensitive data redacted from logs
-- Rate limiting on authentication endpoints
+```bash
+# Backend (without Docker)
+python -m venv venv && venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn vmledger.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Frontend
+cd frontend && npm install && npm run dev
+
+# TypeScript check
+cd frontend && npx tsc --noEmit
+
+# Database migrations
+alembic upgrade head              # Apply all
+alembic revision --autogenerate -m "description"  # Generate new
+alembic downgrade -1              # Rollback one
+```
 
 ## License
 
-[To be determined]
-
-## Contributing
-
-[To be determined]
+MIT License — see [LICENSE](LICENSE) for details.
