@@ -606,192 +606,160 @@ function OverviewTab({
 }) {
   const latestMetric = metrics && metrics.length > 0 ? metrics[0] : null;
   const recentPings = pingHistory ? pingHistory.slice(0, 10) : [];
+  const cpuPct = latestMetric?.cpu_usage_percent ?? null;
+  const ramPct = latestMetric?.ram_used_mb && latestMetric?.ram_total_mb && latestMetric.ram_total_mb > 0
+    ? (latestMetric.ram_used_mb / latestMetric.ram_total_mb) * 100 : null;
+  const diskPct = latestMetric?.disk_usage_percent ?? null;
+
+  // Uptime calculation
+  const totalPings = pingHistory?.length || 0;
+  const successPings = pingHistory?.filter(p => p.success).length || 0;
+  const uptimePct = totalPings > 0 ? ((successPings / totalPings) * 100) : null;
+  const avgLatency = recentPings.filter(p => p.success && p.response_time_ms != null).length > 0
+    ? recentPings.filter(p => p.success && p.response_time_ms != null).reduce((a, p) => a + (p.response_time_ms || 0), 0) / recentPings.filter(p => p.success && p.response_time_ms != null).length : null;
+
+  const getRingColor = (pct: number) => pct >= 90 ? '#ef4444' : pct >= 75 ? '#f59e0b' : pct >= 50 ? '#3b82f6' : '#10b981';
+  const getRingBg = (pct: number) => pct >= 90 ? 'rgba(239,68,68,0.1)' : pct >= 75 ? 'rgba(245,158,11,0.1)' : pct >= 50 ? 'rgba(59,130,246,0.1)' : 'rgba(16,185,129,0.1)';
+  const getRingTextClass = (pct: number) => pct >= 90 ? 'text-red-400' : pct >= 75 ? 'text-amber-400' : pct >= 50 ? 'text-blue-400' : 'text-emerald-400';
+
+  const RingGauge = ({ value, label, subtitle }: { value: number | null; label: string; subtitle?: string }) => {
+    const pct = value ?? 0;
+    const radius = 54;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (Math.min(pct, 100) / 100) * circumference;
+    return (
+      <div className="glass-card p-6 flex flex-col items-center border border-white/5 hover:border-white/10 transition-all group">
+        <div className="relative w-32 h-32 mb-4">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+            {value != null && (
+              <circle cx="60" cy="60" r={radius} fill="none" stroke={getRingColor(pct)} strokeWidth="8"
+                strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
+                style={{ transition: 'stroke-dashoffset 1s ease-out, stroke 0.5s ease' }} />
+            )}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className={`text-2xl font-black font-mono ${value != null ? getRingTextClass(pct) : 'text-gray-500'}`}>
+              {value != null ? `${Math.round(pct)}%` : 'N/A'}
+            </span>
+          </div>
+        </div>
+        <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">{label}</p>
+        {subtitle && <p className="text-[10px] text-gray-500 font-mono mt-1">{subtitle}</p>}
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Current Status Summary */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
-          Resource Utilization
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-panel p-6 border-brand-500/10 hover:border-brand-500/30 transition-all">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m14-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-                CPU Usage
-              </p>
-            </div>
-            <p className="text-3xl font-bold text-white font-mono">
-              {latestMetric?.cpu_usage_percent !== undefined
-                ? `${latestMetric.cpu_usage_percent.toFixed(1)}%`
-                : "N/A"}
-            </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Resource Gauges */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <RingGauge value={cpuPct} label="CPU Usage" subtitle={cpuPct != null ? `${cpuPct.toFixed(1)}%` : undefined} />
+        <RingGauge value={ramPct} label="Memory Usage"
+          subtitle={latestMetric?.ram_used_mb != null && latestMetric?.ram_total_mb != null
+            ? `${latestMetric.ram_used_mb.toLocaleString()} / ${latestMetric.ram_total_mb.toLocaleString()} MB`
+            : undefined}
+        />
+        <RingGauge value={diskPct} label="Disk Usage"
+          subtitle={latestMetric?.disk_used_gb != null && latestMetric?.disk_total_gb != null
+            ? `${latestMetric.disk_used_gb.toFixed(1)} / ${latestMetric.disk_total_gb.toFixed(1)} GB`
+            : undefined}
+        />
+      </div>
+
+      {/* Health Summary Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="glass-card p-4 border border-white/5">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Uptime</p>
+          <p className={`text-xl font-black font-mono ${uptimePct != null && uptimePct >= 99 ? 'text-emerald-400' : uptimePct != null && uptimePct >= 95 ? 'text-amber-400' : uptimePct != null ? 'text-red-400' : 'text-gray-500'}`}>
+            {uptimePct != null ? `${uptimePct.toFixed(1)}%` : 'N/A'}
+          </p>
+          <p className="text-[10px] text-gray-500 mt-0.5">{totalPings} checks</p>
+        </div>
+        <div className="glass-card p-4 border border-white/5">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Avg Latency</p>
+          <p className="text-xl font-black font-mono text-white">
+            {avgLatency != null ? `${avgLatency.toFixed(1)}` : 'N/A'}<span className="text-sm text-gray-500 ml-0.5">ms</span>
+          </p>
+          <p className="text-[10px] text-gray-500 mt-0.5">last {recentPings.length} pings</p>
+        </div>
+        <div className="glass-card p-4 border border-white/5">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Status</p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`w-2.5 h-2.5 rounded-full ${vm.is_reachable === true ? 'bg-emerald-400 shadow-lg shadow-emerald-400/30' : vm.is_reachable === false ? 'bg-red-400 shadow-lg shadow-red-400/30' : 'bg-gray-500'}`} />
+            <span className={`text-sm font-bold ${vm.is_reachable === true ? 'text-emerald-400' : vm.is_reachable === false ? 'text-red-400' : 'text-gray-500'}`}>
+              {vm.is_reachable === true ? 'Online' : vm.is_reachable === false ? 'Offline' : 'Unknown'}
+            </span>
           </div>
-          <div className="glass-panel p-6 border-brand-500/10 hover:border-brand-500/30 transition-all">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-                RAM Usage
-              </p>
-            </div>
-            <p className="text-3xl font-bold text-white font-mono">
-              {latestMetric?.ram_used_mb !== undefined &&
-              latestMetric?.ram_total_mb !== undefined
-                ? `${Math.round((latestMetric.ram_used_mb / latestMetric.ram_total_mb) * 100)}%`
-                : "N/A"}
-            </p>
-            <p className="text-xs text-gray-500 mt-1 font-mono">
-              {latestMetric?.ram_used_mb !== undefined &&
-              latestMetric?.ram_total_mb !== undefined
-                ? `${latestMetric.ram_used_mb}MB / ${latestMetric.ram_total_mb}MB`
-                : ""}
-            </p>
-          </div>
-          <div className="glass-panel p-6 border-brand-500/10 hover:border-brand-500/30 transition-all">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">
-                Disk Usage
-              </p>
-            </div>
-            <p className="text-3xl font-bold text-white font-mono">
-              {latestMetric?.disk_usage_percent !== undefined
-                ? `${latestMetric.disk_usage_percent.toFixed(1)}%`
-                : "N/A"}
-            </p>
-          </div>
+          <p className="text-[10px] text-gray-500 mt-1">{vm.last_seen ? `seen ${formatDistanceToNow(new Date(vm.last_seen), { addSuffix: true })}` : 'never seen'}</p>
+        </div>
+        <div className="glass-card p-4 border border-white/5">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Last Metric</p>
+          <p className="text-sm font-bold text-white">
+            {latestMetric?.timestamp ? formatDistanceToNow(new Date(latestMetric.timestamp), { addSuffix: true }) : 'N/A'}
+          </p>
+          <p className="text-[10px] text-gray-500 mt-1">{latestMetric?.timestamp ? format(new Date(latestMetric.timestamp), 'HH:mm:ss') : 'no data'}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Ping Results */}
-        <div>
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
-            Connectivity Log
-          </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Connectivity Log */}
+        <div className="glass-card border border-white/5 overflow-hidden">
+          <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              Connectivity Log
+            </h3>
+            <span className="text-[10px] text-gray-500">{recentPings.length} recent</span>
+          </div>
           {recentPings.length > 0 ? (
-            <div className="space-y-3">
+            <div className="divide-y divide-white/[0.03]">
               {recentPings.map((ping) => (
-                <div
-                  key={ping.id}
-                  className={`flex items-center justify-between p-4 rounded-xl border backdrop-blur-sm transition-all ${
-                    ping.success
-                      ? "bg-brand-500/5 border-brand-500/20 hover:border-brand-500/40"
-                      : "bg-red-500/5 border-red-500/20 hover:border-red-500/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`p-2 rounded-lg ${ping.success ? "bg-brand-500/10" : "bg-red-500/10"}`}
-                    >
-                      <svg
-                        className={`w-4 h-4 ${ping.success ? "text-brand-400" : "text-red-400"}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        {ping.success ? (
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        ) : (
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        )}
-                      </svg>
-                    </div>
-                    <div>
-                      <span className="block text-sm font-medium text-gray-200">
-                        {format(new Date(ping.timestamp), "MMM d, yyyy")}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {format(new Date(ping.timestamp), "HH:mm:ss")}
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    className={`text-sm font-mono font-bold ${ping.success ? "text-brand-300" : "text-red-400"}`}
-                  >
-                    {ping.success
-                      ? `${ping.response_time_ms?.toFixed(0)}ms`
-                      : ping.error_type || "Failed"}
-                  </div>
+                <div key={ping.id} className="flex items-center px-5 py-2.5 hover:bg-white/[0.02] transition-colors">
+                  <span className={`w-1.5 h-1.5 rounded-full mr-3 flex-shrink-0 ${ping.success ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                  <span className="text-xs text-gray-400 w-20 flex-shrink-0 font-mono">
+                    {format(new Date(ping.timestamp), "HH:mm:ss")}
+                  </span>
+                  <span className="text-[10px] text-gray-500 flex-1 truncate">
+                    {format(new Date(ping.timestamp), "MMM d, yyyy")}
+                  </span>
+                  <span className={`text-xs font-mono font-bold min-w-[50px] text-right ${ping.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {ping.success ? `${ping.response_time_ms?.toFixed(0)}ms` : ping.error_type || 'FAIL'}
+                  </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="glass-panel p-8 text-center">
-              <p className="text-gray-400 text-sm">
-                No connectivity data logged yet.
-              </p>
+            <div className="p-8 text-center">
+              <p className="text-gray-500 text-xs">No connectivity data logged yet.</p>
             </div>
           )}
         </div>
 
-        {/* Deployment Notes Preview */}
-        {vm.deployment_notes && (
-          <div>
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">
+        {/* Deployment Notes */}
+        <div className="glass-card border border-white/5 overflow-hidden">
+          <div className="px-5 py-3 border-b border-white/5">
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               Deployment Manifest
             </h3>
-            <div className="glass-panel p-6 border-white/5 bg-surface-900/80">
-              <div className="text-gray-300 text-sm leading-relaxed prose prose-invert prose-sm">
-                {vm.deployment_notes.substring(0, 500)}
-                {vm.deployment_notes.length > 500 && "..."}
-              </div>
-            </div>
           </div>
-        )}
+          <div className="p-5">
+            {vm.deployment_notes ? (
+              <div className="text-sm text-gray-300 leading-relaxed prose prose-invert prose-sm max-w-none prose-headings:text-gray-200 prose-p:text-gray-300 prose-strong:text-white prose-code:text-brand-300 prose-code:bg-surface-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {vm.deployment_notes}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <svg className="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <p className="text-xs text-gray-500">No deployment notes added.</p>
+                <p className="text-[10px] text-gray-600 mt-1">Edit this VM to add notes (Markdown supported)</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
