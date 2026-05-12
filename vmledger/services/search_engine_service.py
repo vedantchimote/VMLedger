@@ -94,32 +94,51 @@ class SearchEngineService:
             logger.debug(f"Empty search query for user {user_id}")
             return []
         
-        # Convert user query to tsquery format with OR logic
-        # Split on whitespace and join with OR operator
+        # Convert user query to tsquery format with OR logic and prefix matching
+        # Split on whitespace, append :* for prefix matching, join with OR
         query_terms = query.strip().split()
-        ts_query = " | ".join(query_terms)
+        ts_query = " | ".join(f"{term}:*" for term in query_terms)
         
         logger.debug(f"Search query for user {user_id}: '{query}' -> tsquery: '{ts_query}'")
         
         try:
-            # Execute search with ranking
-            # Use to_tsquery with 'simple' config for partial matching
-            results = self.db.query(
+            # Execute full-text search with prefix matching
+            fts_results = self.db.query(
                 VM,
-                func.ts_rank(VM.search_vector, func.to_tsquery('english', ts_query)).label('rank')
+                func.ts_rank(VM.search_vector, func.to_tsquery('simple', ts_query)).label('rank')
             ).filter(
                 VM.user_id == user_id,
-                VM.search_vector.op('@@')(func.to_tsquery('english', ts_query))
+                VM.search_vector.op('@@')(func.to_tsquery('simple', ts_query))
             ).order_by(
                 text('rank DESC'),
                 VM.hostname.asc()
             ).limit(limit).all()
             
-            logger.info(f"Search returned {len(results)} results for user {user_id}")
+            # Also do a ILIKE fallback for substrings that tsquery may miss
+            # (e.g. middle-of-word matches like "node" in "workernode4")
+            like_pattern = f"%{query.strip()}%"
+            ilike_results = self.db.query(
+                VM
+            ).filter(
+                VM.user_id == user_id,
+                (VM.hostname.ilike(like_pattern)) |
+                (VM.ip_address.ilike(like_pattern)) |
+                (VM.domain.ilike(like_pattern))
+            ).limit(limit).all()
+            
+            # Merge results: FTS results first (ranked), then ILIKE extras
+            seen_ids = {vm.id for vm, _ in fts_results}
+            merged = list(fts_results)
+            for vm in ilike_results:
+                if vm.id not in seen_ids:
+                    merged.append((vm, 0.01))  # Low rank for ILIKE-only matches
+                    seen_ids.add(vm.id)
+            
+            logger.info(f"Search returned {len(merged)} results for user {user_id} (FTS: {len(fts_results)}, ILIKE extras: {len(merged) - len(fts_results)})")
             
             # Build search results with highlighting
             search_results = []
-            for vm, rank in results:
+            for vm, rank in merged:
                 highlighted_notes = None
                 
                 # Highlight matches in deployment notes if present
@@ -166,9 +185,9 @@ class SearchEngineService:
             result = self.db.execute(
                 text("""
                     SELECT ts_headline(
-                        'english',
+                        'simple',
                         :text,
-                        to_tsquery('english', :query),
+                        to_tsquery('simple', :query),
                         'MaxFragments=3, MaxWords=50, MinWords=25, StartSel=<mark>, StopSel=</mark>'
                     )
                 """),
