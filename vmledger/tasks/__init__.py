@@ -387,15 +387,19 @@ def dns_resolve_task(self, vm_id: int):
                 }
             
             hostname = vm.hostname
+            domain = vm.domain
             stored_ip = vm.ip_address
             resolved_ip = None
             dns_mismatch = False
             error_msg = None
             
+            # Use domain (FQDN) if available, otherwise fallback to hostname
+            target_name = domain if domain else hostname
+            
             try:
                 # Resolve hostname to IP address
                 # getaddrinfo returns list of (family, type, proto, canonname, sockaddr)
-                results = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                results = socket.getaddrinfo(target_name, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
                 if results:
                     # Take the first result's IP address
                     resolved_ip = results[0][4][0]
