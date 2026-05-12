@@ -598,19 +598,119 @@ class MetricCollectorService:
             except Exception as e:
                 last_error = str(e)
                 logger.error(
-                    f"Unexpected error during metric collection for VM {vm.id}: {e}"
+                    f"Unexpected error collecting metrics for VM {vm.id} "
+                    f"(attempt {attempt}): {e}",
+                    exc_info=True
                 )
-                break
         
-        # All retries failed
-        error_msg = f"Failed to collect metrics after {self.max_retries} attempts: {last_error}"
-        logger.error(f"VM {vm.id}: {error_msg}")
-        
+        logger.error(f"All metric collection attempts failed for VM {vm.id}")
         return MetricData(
             collection_success=False,
-            error_message=error_msg
+            error_message=last_error
         )
-    
+
+    def fetch_vm_specs(self, vm_id: int) -> dict:
+        """
+        Fetch detailed hardware and OS specifications from a VM via SSH.
+        
+        Args:
+            vm_id: ID of the VM
+            
+        Returns:
+            Dictionary containing OS, CPU, RAM, and Disk specifications
+        """
+        vm = self.db.query(VM).filter(VM.id == vm_id).first()
+        if not vm:
+            raise MetricCollectorServiceError(f"VM not found: {vm_id}")
+            
+        credential = self.db.query(Credential).filter(Credential.vm_id == vm_id).first()
+        if not credential:
+            raise MetricCollectorServiceError(f"No credentials found for VM {vm_id}")
+
+        decrypted_credential = self.credential_manager.get_decrypted_credential(
+            credential.id, vm.user_id
+        )
+        if not decrypted_credential:
+            raise MetricCollectorServiceError("Failed to decrypt credential")
+
+        try:
+            client = self._create_ssh_client(
+                ip_address=vm.ip_address,
+                port=vm.ssh_port,
+                username=credential.username,
+                auth_type=credential.auth_type,
+                credential=decrypted_credential
+            )
+            
+            try:
+                os_type = self.detect_os(client)
+                specs = {
+                    "os_type": os_type,
+                    "os_name": "Unknown",
+                    "kernel": "Unknown",
+                    "cpu_model": "Unknown",
+                    "cpu_cores": 0,
+                    "ram_total_gb": 0,
+                    "partitions": []
+                }
+                
+                # OS details
+                stdout, _, exit_code = self._execute_command(client, "uname -r")
+                if exit_code == 0:
+                    specs["kernel"] = stdout.strip()
+                    
+                if os_type == self.OS_LINUX:
+                    stdout, _, exit_code = self._execute_command(client, "cat /etc/os-release | grep PRETTY_NAME")
+                    if exit_code == 0 and "PRETTY_NAME=" in stdout:
+                        specs["os_name"] = stdout.split("=")[1].strip().strip('"')
+                        
+                    # CPU details
+                    stdout, _, exit_code = self._execute_command(client, "lscpu | grep 'Model name'")
+                    if exit_code == 0 and ":" in stdout:
+                        specs["cpu_model"] = stdout.split(":")[1].strip()
+                        
+                    stdout, _, exit_code = self._execute_command(client, "nproc")
+                    if exit_code == 0:
+                        try:
+                            specs["cpu_cores"] = int(stdout.strip())
+                        except ValueError:
+                            pass
+                            
+                    # RAM details
+                    stdout, _, exit_code = self._execute_command(client, "free -m | grep Mem")
+                    if exit_code == 0:
+                        parts = stdout.split()
+                        if len(parts) >= 2:
+                            try:
+                                specs["ram_total_gb"] = round(int(parts[1]) / 1024, 2)
+                            except ValueError:
+                                pass
+                                
+                    # Partitions
+                    stdout, _, exit_code = self._execute_command(client, "df -h")
+                    if exit_code == 0:
+                        lines = stdout.strip().split('\n')
+                        for line in lines[1:]:
+                            parts = line.split()
+                            if len(parts) >= 6 and not parts[0].startswith('tmpfs') and not parts[0].startswith('devtmpfs'):
+                                specs["partitions"].append({
+                                    "filesystem": parts[0],
+                                    "size": parts[1],
+                                    "used": parts[2],
+                                    "avail": parts[3],
+                                    "use_percent": parts[4],
+                                    "mounted_on": parts[5]
+                                })
+                
+                return specs
+                
+            finally:
+                client.close()
+                
+        except Exception as e:
+            logger.error(f"Failed to fetch specs for VM {vm.id}: {e}")
+            raise MetricCollectorServiceError(f"Failed to fetch specs: {e}")
+            
     def store_metrics(self, vm_id: int, metrics: MetricData) -> None:
         """
         Store collected metrics to database.
