@@ -1540,6 +1540,80 @@ async def get_vm_status(
 
 
 @router.get(
+    "/{vm_id}/specs",
+    status_code=status.HTTP_200_OK,
+    summary="Get VM Specs",
+    description="Live fetch detailed hardware and OS specs from a VM via SSH"
+)
+def get_vm_specs(
+    request: Request,
+    vm_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Live fetch detailed hardware and OS specs from a VM via SSH.
+    """
+    request_id = getattr(request.state, "request_id", "unknown")
+    user_id = getattr(request.state, "user_id", None)
+    
+    if not user_id:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"success": False, "message": "Not authenticated"}
+        )
+    logger.info(
+        f"Fetching live specs for VM {vm_id} (user {user_id})",
+        extra={"context": {"vm_id": vm_id, "request_id": request_id}}
+    )
+    
+    try:
+        from vmledger.services.vm_registry_service import VMRegistryService
+        vm_service = VMRegistryService(db)
+        vm = vm_service.get_vm(user_id, vm_id)
+        if not vm:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={
+                    "success": False,
+                    "error": {
+                        "code": "NOT_FOUND",
+                        "message": f"VM {vm_id} not found"
+                    },
+                    "request_id": request_id
+                }
+            )
+            
+        from vmledger.services.metric_collector_service import MetricCollectorService
+        collector = MetricCollectorService(db)
+        specs = collector.fetch_vm_specs(vm_id)
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "data": specs,
+                "request_id": request_id
+            }
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch specs for VM {vm_id}: {str(e)}",
+            exc_info=True,
+            extra={"context": {"vm_id": vm_id, "request_id": request_id}}
+        )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "error": {
+                    "code": "SPECS_FETCH_ERROR",
+                    "message": f"Failed to fetch VM specs: {str(e)}"
+                },
+                "request_id": request_id
+            }
+        )
+
+@router.get(
     "/{vm_id}/alerts/config",
     status_code=status.HTTP_200_OK,
     summary="Get alert configuration",
@@ -2401,3 +2475,183 @@ def invalidate_vmlist_cache(user_id: int) -> None:
                 
         except redis.RedisError as e:
             logger.warning(f"Failed to invalidate VM list cache: {e}")
+
+
+# ─── Manual Trigger Endpoints ─────────────────────────────────────────────────
+# These endpoints allow users to trigger monitoring tasks on-demand for a single
+# VM instead of waiting for the scheduled Celery Beat intervals.
+
+
+@router.post(
+    "/{vm_id}/trigger/ping",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger Manual Ping Check",
+    description="Dispatch a ping check task for a single VM immediately"
+)
+async def trigger_ping_check(
+    vm_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+) -> JSONResponse:
+    """
+    Trigger an on-demand ping check for a specific VM.
+
+    Dispatches the ping_check_task Celery task immediately.
+    The task runs asynchronously; poll the VM status endpoint for results.
+    """
+    try:
+        user_id = get_user_id(request)
+        vm_service = VMRegistryService(db)
+        vm = vm_service.get_vm(user_id=user_id, vm_id=vm_id)
+
+        from vmledger.tasks import ping_check_task
+        task_result = ping_check_task.delay(vm.id)
+
+        logger.info(f"Manual ping check triggered for VM {vm_id} by user {user_id}, task_id={task_result.id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "success": True,
+                "message": f"Ping check dispatched for VM {vm.hostname}",
+                "data": {
+                    "task_id": task_result.id,
+                    "vm_id": vm.id,
+                    "hostname": vm.hostname,
+                }
+            }
+        )
+
+    except VMNotFoundError:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"success": False, "message": "VM not found"}
+        )
+    except UnauthorizedAccessError:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"success": False, "message": "Not authorized to access this VM"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to trigger ping check for VM {vm_id}: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "message": "Failed to trigger ping check"}
+        )
+
+
+@router.post(
+    "/{vm_id}/trigger/dns-check",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger Manual DNS Resolution",
+    description="Dispatch a DNS resolution task for a single VM immediately"
+)
+async def trigger_dns_check(
+    vm_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+) -> JSONResponse:
+    """
+    Trigger an on-demand DNS resolution check for a specific VM.
+
+    Resolves the VM hostname and compares against the registered IP address.
+    The task runs asynchronously; refresh the VM details to see updated results.
+    """
+    try:
+        user_id = get_user_id(request)
+        vm_service = VMRegistryService(db)
+        vm = vm_service.get_vm(user_id=user_id, vm_id=vm_id)
+
+        from vmledger.tasks import dns_resolve_task
+        task_result = dns_resolve_task.delay(vm.id)
+
+        logger.info(f"Manual DNS check triggered for VM {vm_id} by user {user_id}, task_id={task_result.id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "success": True,
+                "message": f"DNS resolution dispatched for VM {vm.hostname}",
+                "data": {
+                    "task_id": task_result.id,
+                    "vm_id": vm.id,
+                    "hostname": vm.hostname,
+                }
+            }
+        )
+
+    except VMNotFoundError:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"success": False, "message": "VM not found"}
+        )
+    except UnauthorizedAccessError:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"success": False, "message": "Not authorized to access this VM"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to trigger DNS check for VM {vm_id}: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "message": "Failed to trigger DNS check"}
+        )
+
+
+@router.post(
+    "/{vm_id}/trigger/collect-metrics",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger Manual Metrics Collection",
+    description="Dispatch a metrics collection task for a single VM immediately"
+)
+async def trigger_collect_metrics(
+    vm_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+) -> JSONResponse:
+    """
+    Trigger an on-demand metrics collection for a specific VM.
+
+    Collects CPU, RAM, and Disk usage via SSH.
+    The task runs asynchronously; refresh the VM details to see updated metrics.
+    """
+    try:
+        user_id = get_user_id(request)
+        vm_service = VMRegistryService(db)
+        vm = vm_service.get_vm(user_id=user_id, vm_id=vm_id)
+
+        from vmledger.tasks import collect_metrics_task
+        task_result = collect_metrics_task.delay(vm.id)
+
+        logger.info(f"Manual metrics collection triggered for VM {vm_id} by user {user_id}, task_id={task_result.id}")
+
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={
+                "success": True,
+                "message": f"Metrics collection dispatched for VM {vm.hostname}",
+                "data": {
+                    "task_id": task_result.id,
+                    "vm_id": vm.id,
+                    "hostname": vm.hostname,
+                }
+            }
+        )
+
+    except VMNotFoundError:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"success": False, "message": "VM not found"}
+        )
+    except UnauthorizedAccessError:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"success": False, "message": "Not authorized to access this VM"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to trigger metrics collection for VM {vm_id}: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "message": "Failed to trigger metrics collection"}
+        )
+
