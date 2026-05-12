@@ -627,17 +627,26 @@ class MetricCollectorService:
         if not credential:
             raise MetricCollectorServiceError(f"No credentials found for VM {vm_id}")
 
-        decrypted_credential = self.credential_manager.get_decrypted_credential(
-            credential.id, vm.user_id
-        )
-        if not decrypted_credential:
-            raise MetricCollectorServiceError("Failed to decrypt credential")
+        # Decrypt credentials using the same pattern as collect_metrics_for_vm
+        try:
+            if credential.auth_type == 'ssh_key':
+                decrypted_credential = self.credential_manager.decrypt_ssh_key(
+                    vm.user_id,
+                    credential.encrypted_credential
+                )
+            else:
+                decrypted_credential = self.credential_manager.decrypt_password(
+                    vm.user_id,
+                    credential.encrypted_credential
+                )
+        except Exception as e:
+            raise MetricCollectorServiceError(f"Failed to decrypt credentials for VM {vm_id}: {e}")
 
         try:
             client = self._create_ssh_client(
                 ip_address=vm.ip_address,
                 port=vm.ssh_port,
-                username=credential.username,
+                username=credential.ssh_username,
                 auth_type=credential.auth_type,
                 credential=decrypted_credential
             )
