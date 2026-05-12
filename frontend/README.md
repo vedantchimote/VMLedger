@@ -74,13 +74,28 @@ The dashboard supports 6 view modes, switchable via toolbar icons:
 
 ## VM Detail Page Tabs
 
-| Tab        | Description                                                  |
-|------------|--------------------------------------------------------------|
-| Monitoring | CPU, RAM, Disk usage over time                               |
-| Ping       | Ping history with response times                             |
-| DNS        | Registered IP vs resolved IP, drift detection                |
-| Specs      | Live hardware specs (OS, CPU, RAM, partitions) fetched via SSH |
-| Alerts     | Alert configuration and history                              |
+### Overview Tab
+- **SVG ring gauges**: CPU, Memory, Disk with animated fill and color thresholds (green/blue/amber/red)
+- **Health summary**: 4 KPI cards — Uptime %, Avg Latency, Status (glowing dot + relative time), Last Metric
+- **Connectivity log**: Compact table rows with status dots and latency
+- **Deployment manifest**: Markdown-rendered notes via ReactMarkdown + remark-gfm
+
+### Metrics Tab
+- **Time range selector**: 1H / 6H / 24H / 7D / All
+- **Chart mode**: Individual (3 separate charts) or Combined (overlay with toggle legends)
+- **Stats cards**: Current, Min, Avg, Max for each metric; Max ≥ 90% highlighted red
+- **Custom tooltip**: Full datetime, colored metric dots, RAM MB sub-breakdown
+
+### Other Tabs
+| Tab    | Description                                                      |
+|--------|------------------------------------------------------------------|
+| Specs  | Live hardware specs (OS, CPU, RAM, partitions) fetched via SSH   |
+| Ping   | Full ping history with response times and success/failure        |
+| Notes  | Full Markdown-rendered deployment notes                          |
+| Alerts | Alert webhook configuration and event history                    |
+
+### Trigger Actions
+Ping Now / DNS Check / Collect Metrics buttons fire backend tasks and show a **radar-style pinging animation** with a 5-second progress bar. Data refreshes silently via React Query `refetch()` — no page reload.
 
 ## React Query Hooks
 
@@ -94,7 +109,7 @@ The dashboard supports 6 view modes, switchable via toolbar icons:
 - `useVMs()` — Fetch all VMs for current user
 - `useVM(id)` — Fetch single VM details
 - `useVMSpecs(id)` — Fetch live hardware specs (5-min stale time)
-- `useVMSearch(query)` — Full-text search across VMs
+- `useVMSearch(query)` — Full-text search with prefix matching (results enriched with dashboard metrics)
 - `useCreateVM()` — Register new VM
 - `useUpdateVM()` — Update VM fields
 - `useDeleteVM()` — Delete VM and all associated data

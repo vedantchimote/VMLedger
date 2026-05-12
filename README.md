@@ -33,8 +33,9 @@ VMLedger is an agentless monitoring and configuration management database (CMDB)
 ### Real-Time Monitoring
 - Automated ICMP + TCP ping checks every 60 seconds
 - SSH-based system metrics collection (CPU, RAM, Disk) every 5 minutes
-- On-demand triggers: Ping, DNS Check, and Metrics Collection via UI buttons
+- On-demand triggers: Ping, DNS Check, and Metrics Collection with animated radar feedback
 - Historical data retention (last 1000 data points per VM)
+- Trigger actions refetch data silently (no page reload)
 
 ### Live VM Specs
 - One-click hardware spec fetch via SSH (`lscpu`, `free`, `df`, `/etc/os-release`)
@@ -68,6 +69,12 @@ VMLedger is an agentless monitoring and configuration management database (CMDB)
 - Configurable cooldown periods (default: 15 minutes)
 - Alert history and acknowledgment tracking
 - Per-VM alert configuration
+
+### Search
+- Partial/prefix matching: typing `harbor` finds `harbornode`
+- Full-text search with PostgreSQL tsquery + ILIKE fallback
+- Search results display full resource metrics (cross-referenced with dashboard data)
+- Relevance ranking with highlighted matches in deployment notes
 
 ### Security
 - JWT authentication with 24-hour sessions
@@ -202,28 +209,41 @@ curl -X POST http://localhost:8000/api/auth/register \
 | Method | Endpoint          | Description                              |
 |--------|-------------------|------------------------------------------|
 | GET    | `/api/dashboard`  | Aggregated dashboard with all VMs + metrics |
-| GET    | `/api/search`     | Full-text search across VMs              |
+| GET    | `/api/search`     | Full-text search with prefix matching    |
 
 ## 🖥️ Dashboard
 
 The dashboard provides 6 view modes for different use cases:
 
-- **Grid**: Visual VM cards with health bars and status badges
+- **Grid**: VM cards with health bars and status badges
 - **List**: Compact rows for large fleets
 - **Table**: Sortable columns for data comparison
 - **Kanban**: Drag-style columns grouped by status
-- **Minimal**: Dot-grid for quick status scanning
-- **Analytics**: Full fleet metrics with resource pools, leaderboards, DNS health, and per-instance table
+- **Minimal**: Ultra-compact status dots
+- **Analytics**: Fleet-wide KPIs, resource pools, top consumers, DNS health, latency ranking, tag distribution, per-instance table
 
-### VM Detail Page Tabs
+### VM Detail Page
 
-| Tab        | Content                                                   |
-|------------|-----------------------------------------------------------|
-| Monitoring | CPU, RAM, Disk metrics charts with historical trends      |
-| Ping       | Ping history with response times and success/failure      |
-| DNS        | Registered IP vs resolved IP, mismatch detection          |
-| Specs      | Live OS, CPU, RAM, storage partition data fetched via SSH  |
-| Alerts     | Alert configuration and history for the VM                |
+#### Overview Tab
+- **SVG ring gauges** for CPU, Memory, Disk with color-coded thresholds
+- **Health summary**: Uptime %, Avg Latency, Status (with relative time), Last Metric timestamp
+- **Connectivity log**: Compact table with status dots
+- **Deployment manifest**: Markdown-rendered notes with prose styling
+
+#### Metrics Tab
+- **Time range selector**: 1H / 6H / 24H / 7D / All
+- **Chart mode toggle**: Individual (3 separate) or Combined (overlay)
+- **Stats summary**: Current, Min, Avg, Max per metric
+- **Custom tooltip**: Full timestamp, colored dots, RAM MB breakdown
+- In Combined mode: clickable legend toggles to show/hide each metric
+
+#### Other Tabs
+| Tab    | Content                                                      |
+|--------|--------------------------------------------------------------|
+| Specs  | Live OS, CPU, RAM, storage partition data fetched via SSH    |
+| Ping   | Full ping history with response times and success/failure    |
+| Notes  | Markdown-rendered deployment notes                           |
+| Alerts | Alert webhook configuration and event history                |
 
 ## 📁 Project Structure
 
