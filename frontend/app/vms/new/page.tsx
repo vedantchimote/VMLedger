@@ -283,7 +283,7 @@ export default function NewVMPage() {
         <div className="glass-card p-10">
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">
-              Deploy New Virtual Machine
+              Register New Virtual Machine
             </h2>
             <p className="text-gray-400">
               Add a new VM to your infrastructure ledger for centralized
