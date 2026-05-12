@@ -66,8 +66,21 @@ export const tokenManager = {
 
   isTokenExpired(): boolean {
     if (typeof window === "undefined") return true;
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return true;
     const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-    if (!expiry) return true;
+    // If no expiry record but token exists, try to decode it directly
+    if (!expiry) {
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (payload.exp) {
+          return new Date(payload.exp * 1000) <= new Date();
+        }
+      } catch {
+        // Can't decode — assume valid to avoid locking user out
+      }
+      return false; // Token exists but no expiry — assume valid
+    }
     return new Date(expiry) <= new Date();
   },
 
@@ -110,15 +123,16 @@ const createAxiosInstance = (): AxiosInstance => {
       return response;
     },
     (error: AxiosError) => {
-      // Handle 401 Unauthorized - token expired or invalid
+      // Handle 401 Unauthorized — only remove token and redirect if we
+      // are NOT already on the login/register pages (to avoid redirect loops)
       if (error.response?.status === 401) {
-        tokenManager.removeToken();
-
-        // Redirect to login page if not already there
         if (
           typeof window !== "undefined" &&
-          !window.location.pathname.includes("/login")
+          !window.location.pathname.includes("/login") &&
+          !window.location.pathname.includes("/register")
         ) {
+          // Remove stale token and redirect to login
+          tokenManager.removeToken();
           window.location.href = "/login";
         }
       }
@@ -217,6 +231,14 @@ export const api = {
       }
 
       throw new Error(response.data.error?.message || "Failed to fetch VM");
+    },
+
+    async getSpecs(vmId: number): Promise<any> {
+      const response = await apiClient.get<ApiResponse<any>>(`/vms/${vmId}/specs`);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.error?.message || "Failed to fetch VM specs");
     },
 
     async create(vmData: VMCreateRequest): Promise<VM> {
@@ -380,6 +402,22 @@ export const api = {
         latest_disk_percent:
           vm.latest_metrics?.disk_usage_percent ?? vm.latest_disk_percent,
       }));
+    },
+  },
+
+  // Triggers
+  triggers: {
+    async triggerPing(vmId: number): Promise<any> {
+      const response = await apiClient.post<ApiResponse<any>>(`/vms/${vmId}/trigger/ping`);
+      return response.data;
+    },
+    async triggerDnsCheck(vmId: number): Promise<any> {
+      const response = await apiClient.post<ApiResponse<any>>(`/vms/${vmId}/trigger/dns-check`);
+      return response.data;
+    },
+    async triggerCollectMetrics(vmId: number): Promise<any> {
+      const response = await apiClient.post<ApiResponse<any>>(`/vms/${vmId}/trigger/collect-metrics`);
+      return response.data;
     },
   },
 };

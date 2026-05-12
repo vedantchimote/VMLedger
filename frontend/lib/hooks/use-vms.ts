@@ -36,6 +36,18 @@ export function useVM(vmId: number) {
 }
 
 /**
+ * Hook to fetch VM Specs
+ */
+export function useVMSpecs(vmId: number) {
+  return useQuery({
+    queryKey: [...vmKeys.detail(vmId), 'specs'],
+    queryFn: () => api.vms.getSpecs(vmId),
+    enabled: !!vmId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+/**
  * Hook to search VMs
  */
 export function useVMSearch(query: string) {

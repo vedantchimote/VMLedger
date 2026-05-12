@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
+import { api, tokenManager } from '@/lib/api-client';
 
 /**
  * Query Keys for Dashboard
@@ -17,9 +17,16 @@ export function useDashboard() {
   return useQuery({
     queryKey: dashboardKeys.summary(),
     queryFn: () => api.dashboard.getSummary(),
+    // Only fetch when authenticated
+    enabled: tokenManager.isAuthenticated(),
     // Auto-refresh every 30 seconds (Requirement 12.6)
     refetchInterval: 30 * 1000,
     // Keep previous data while refetching for smooth UX
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: any) => previousData,
+    // Don't retry on 401
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 401) return false;
+      return failureCount < 3;
+    },
   });
 }
