@@ -6,7 +6,7 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth, useLogout } from "@/lib/hooks/use-auth";
 import { useDashboard } from "@/lib/hooks/use-dashboard";
-import { useVMSearch } from "@/lib/hooks/use-vms";
+import { useVMSearch, useDeleteVM } from "@/lib/hooks/use-vms";
 import type { VM } from "@/types/api";
 import { KanbanCard } from "./KanbanCard";
 
@@ -31,6 +31,37 @@ export default function DashboardPage() {
   const router = useRouter();
   const { isAuthenticated, isMounted } = useAuth();
   const logoutMutation = useLogout();
+  const deleteMutation = useDeleteVM();
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Selection state
+  const [selectedVms, setSelectedVms] = useState<number[]>([]);
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedVms.length} selected VM(s)? This action cannot be undone.`)) return;
+    setIsDeleting(true);
+    try {
+      await Promise.all(selectedVms.map(id => deleteMutation.mutateAsync(id)));
+      setSelectedVms([]);
+    } catch (err) {
+      alert("Failed to delete some VMs. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleSelection = (id: number) => {
+    setSelectedVms(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
+  };
+
+  const toggleSelectAll = (ids: number[]) => {
+    if (selectedVms.length === ids.length) {
+      setSelectedVms([]);
+    } else {
+      setSelectedVms(ids);
+    }
+  };
+
   const {
     data: allVms,
     isLoading,
@@ -119,11 +150,29 @@ export default function DashboardPage() {
     );
   };
 
+  // Redirect to login if not authenticated after mount
+  useEffect(() => {
+    if (isMounted && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isMounted, isAuthenticated, router]);
+
   // Show loading while checking auth state
-  if (!isMounted || !isAuthenticated) {
+  if (!isMounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-white">Loading...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+          <div className="text-white/60 text-sm">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="text-white/60 text-sm">Redirecting to login...</div>
       </div>
     );
   }
@@ -197,6 +246,18 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="flex items-center gap-4">
+              {selectedVms.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl transition-all font-semibold flex items-center gap-2 border border-red-500/20 shadow-lg shadow-red-500/5"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {isDeleting ? "Deleting..." : `Remove (${selectedVms.length})`}
+                </button>
+              )}
               <Link href="/vms/new" className="btn-primary">
                 <svg
                   className="w-4 h-4 mr-2"
@@ -535,19 +596,27 @@ export default function DashboardPage() {
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     {/* VM Card Header */}
-                    <div className="p-6 pb-5">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1 min-w-0 pr-4">
-                          <div className="flex items-center gap-3 mb-1">
-                            <Link href={`/vms/${vm.id}`} className="text-lg font-bold text-white truncate tracking-tight hover:text-brand-300 transition-colors">
-                              {vm.hostname}
-                            </Link>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-400">
-                            <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                            </svg>
-                            <span className="truncate font-mono text-xs">{vm.ip_address}</span>
+                    <div className="p-6 pb-5 flex-grow relative">
+                      <div className="flex items-start justify-between mb-4 gap-4">
+                        <div className="flex-1 min-w-0 flex items-start gap-3">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedVms.includes(vm.id)}
+                            onChange={() => toggleSelection(vm.id)}
+                            className="mt-1.5 w-4 h-4 rounded border-white/20 bg-surface-800/50 text-brand-500 focus:ring-brand-500/50 focus:ring-offset-0 transition-colors cursor-pointer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-1">
+                              <Link href={`/vms/${vm.id}`} className="text-lg font-bold text-white truncate tracking-tight hover:text-brand-300 transition-colors">
+                                {vm.hostname}
+                              </Link>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                              <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                              </svg>
+                              <span className="truncate font-mono text-xs">{vm.ip_address}</span>
+                            </div>
                           </div>
                         </div>
                         <span className={vm.is_reachable === true ? "status-badge-online" : vm.is_reachable === false ? "status-badge-offline" : "status-badge-unknown"}>
@@ -640,6 +709,12 @@ export default function DashboardPage() {
                 {displayVms.map((vm: VM, idx) => (
                   <div key={vm.id} className="glass-card group flex flex-col md:flex-row items-center p-4 gap-6" style={{ animationDelay: `${idx * 50}ms` }}>
                     <div className="flex-1 min-w-0 flex items-center gap-4">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedVms.includes(vm.id)}
+                        onChange={() => toggleSelection(vm.id)}
+                        className="w-4 h-4 rounded border-white/20 bg-surface-800/50 text-brand-500 focus:ring-brand-500/50 focus:ring-offset-0 transition-colors cursor-pointer"
+                      />
                       <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${vm.is_reachable === true ? "bg-brand-500 shadow-[0_0_8px_rgba(20,184,166,0.6)] animate-pulse" : vm.is_reachable === false ? "bg-red-500" : "bg-gray-500"}`}></span>
                       <div>
                         <Link href={`/vms/${vm.id}`} className="text-base font-bold text-white truncate tracking-tight hover:text-brand-300 transition-colors block">
@@ -702,6 +777,14 @@ export default function DashboardPage() {
                 <table className="w-full text-left text-sm text-gray-300">
                   <thead className="text-[10px] uppercase tracking-wider bg-surface-800 text-gray-400 border-b border-white/5">
                     <tr>
+                      <th className="px-6 py-4 w-4">
+                        <input 
+                          type="checkbox" 
+                          checked={displayVms.length > 0 && selectedVms.length === displayVms.length}
+                          onChange={() => toggleSelectAll(displayVms.map(v => v.id))}
+                          className="w-4 h-4 rounded border-white/20 bg-surface-800/50 text-brand-500 focus:ring-brand-500/50 focus:ring-offset-0 transition-colors cursor-pointer"
+                        />
+                      </th>
                       <th className="px-6 py-4 font-bold">Status</th>
                       <th className="px-6 py-4 font-bold">Hostname</th>
                       <th className="px-6 py-4 font-bold">IP Address</th>
@@ -714,6 +797,14 @@ export default function DashboardPage() {
                   <tbody>
                     {displayVms.map((vm, idx) => (
                       <tr key={vm.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedVms.includes(vm.id)}
+                            onChange={() => toggleSelection(vm.id)}
+                            className="w-4 h-4 rounded border-white/20 bg-surface-800/50 text-brand-500 focus:ring-brand-500/50 focus:ring-offset-0 transition-colors cursor-pointer"
+                          />
+                        </td>
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${vm.is_reachable === true ? "bg-brand-500/10 text-brand-400 border border-brand-500/20" : vm.is_reachable === false ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-gray-500/10 text-gray-400 border border-gray-500/20"}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${vm.is_reachable === true ? "bg-brand-500 animate-pulse" : vm.is_reachable === false ? "bg-red-500" : "bg-gray-500"}`}></span>
