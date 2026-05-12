@@ -7,7 +7,7 @@ api: 'GET /api/vms/search'
 
 ## Overview
 
-The Search API provides powerful full-text search across IP addresses, hostnames, domains, tags, and deployment notes.
+The Search API provides powerful full-text search with **prefix matching** across IP addresses, hostnames, domains, tags, and deployment notes. Uses PostgreSQL's `to_tsquery('simple', ...)` with `:*` suffix for prefix matching, plus an ILIKE fallback for substring matches.
 
 ## Search VMs
 
@@ -17,35 +17,40 @@ The Search API provides powerful full-text search across IP addresses, hostnames
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| q | string | Yes | Search query (min 2 characters) |
+| q | string | Yes | Search query (min 1 character) |
+| limit | integer | No | Max results (default: 50, max: 100) |
 
 ### Response (200 OK)
 
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": 123,
-      "hostname": "web-server-01",
-      "ip_address": "192.168.1.100",
-      "tags": ["production", "nginx"],
-      "rank": 0.95,
-      "highlights": [
-        "...Installed Software\n- <mark>Nginx</mark> 1.24.0..."
-      ]
-    }
-  ]
+  "data": {
+    "results": [
+      {
+        "id": 123,
+        "hostname": "web-server-01",
+        "ip_address": "192.168.1.100",
+        "tags": ["production", "nginx"],
+        "rank": 0.95,
+        "highlighted_notes": "...Installed Software\n- <mark>Nginx</mark> 1.24.0..."
+      }
+    ],
+    "count": 1,
+    "query": "nginx"
+  }
 }
 ```
 
 ### Search Features
 
-- **Partial matching**: "ngin" matches "nginx"
-- **Multi-term search**: "nginx production" (OR logic)
-- **Relevance ranking**: Exact matches rank higher
-- **Highlighting**: Matches wrapped in `<mark>` tags
-- **Fast performance**: < 500ms for 1000 VMs
+- **Prefix matching**: `harbor` matches `harbornode`, `harbor-vm`, etc. (`:*` suffix in tsquery)
+- **ILIKE fallback**: Catches mid-word substrings that tsquery misses (e.g. `node` in `workernode4`)
+- **Multi-term search**: `nginx production` uses OR logic — matches either term
+- **Relevance ranking**: FTS results ranked first, ILIKE-only matches appended at lower rank
+- **Highlighting**: Matches in deployment notes wrapped in `<mark>` tags
+- **Simple config**: Uses `'simple'` text search config (no stemming) for reliable partial matching
+- **Fast performance**: &lt; 500ms for 1000 VMs
 
 ### Code Examples
 

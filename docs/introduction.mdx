@@ -59,10 +59,12 @@ VMLedger is a comprehensive virtual machine management platform designed to help
 
 ### 📊 Real-Time Monitoring
 - Automated ping checks every 60 seconds
-- System metrics collection (CPU, memory, disk, network)
-- Historical data tracking and visualization
+- System metrics collection (CPU, memory, disk) every 5 minutes via SSH
+- Historical data tracking and visualization with time range filtering (1H / 6H / 24H / 7D / All)
 - **DNS drift detection** checking hostname vs IP discrepancies every 6 hours
-- Customizable monitoring intervals
+- On-demand triggers with animated radar feedback (no page reload)
+- SVG ring gauges for CPU, Memory, Disk with color-coded thresholds
+- Combined/individual chart modes with clickable metric toggles
 
 ### 🔔 Intelligent Alerting
 - Webhook-based notifications (Slack, Discord, custom endpoints)
@@ -70,17 +72,16 @@ VMLedger is a comprehensive virtual machine management platform designed to help
 - Alert history and acknowledgment tracking
 - Multiple alert channels per VM
 
-### 🚀 Deployment Management
-- Track deployments with timestamps and notes
-- Link deployments to specific VMs
-- Deployment history and rollback tracking
-- Support for up to 50,000 characters in deployment notes
+### 🚀 VM Specs & Hardware Info
+- One-click hardware spec fetch via SSH (`lscpu`, `free`, `df`, `/etc/os-release`)
+- Displays OS name, kernel version, CPU model & cores, total RAM, storage partitions
+- Dedicated Specs tab on each VM's detail page
 
 ### 🔍 Advanced Search
-- Full-text search across VMs, deployments, and alerts
-- Filter by tags, status, and date ranges
-- Fast search with Redis caching
-- Fuzzy matching support
+- Partial/prefix matching: typing `harbor` finds `harbornode`
+- Full-text search with PostgreSQL tsquery + ILIKE fallback
+- Search results display full resource metrics (CPU, RAM, Disk)
+- Relevance ranking with highlighted matches in deployment notes
 
 ### 🔐 Security First
 - JWT-based authentication with 24-hour sessions

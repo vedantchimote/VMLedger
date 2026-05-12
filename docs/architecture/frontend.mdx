@@ -64,33 +64,77 @@ frontend/
 
 ## Key Features
 
+### 6-Mode Dashboard
+
+The dashboard supports Grid, List, Table, Kanban, Minimal, and Analytics view modes — all switchable from the toolbar:
+
+```typescript
+type ViewMode = 'grid' | 'list' | 'table' | 'kanban' | 'minimal' | 'analytics';
+const [viewMode, setViewMode] = useState<ViewMode>('grid');
+```
+
+### VM Detail — Overview Tab
+
+- **SVG ring gauges** for CPU, Memory, Disk with animated `stroke-dasharray` fill
+- Color-coded thresholds: green (&lt;50%) → blue → amber → red (≥90%)
+- **Health summary**: Uptime %, Avg Latency, Status, Last Metric timestamp
+- **Connectivity log**: Compact table rows with status dots
+- **Deployment manifest**: Markdown-rendered via `ReactMarkdown` + `remark-gfm`
+
+### VM Detail — Metrics Tab
+
+- **Time range selector**: 1H / 6H / 24H / 7D / All filters data by timestamp
+- **Chart mode toggle**: Individual (3 separate) or Combined (overlay on single chart)
+- **Stats cards**: Current, Min, Avg, Max per metric
+- **Custom tooltip**: Full datetime, colored dots, RAM MB breakdown
+- In Combined mode: clickable legend toggles to show/hide CPU / Memory / Disk
+
+### Animated Trigger Actions
+
+Ping Now / DNS Check / Collect Metrics fire backend tasks and show a **radar-style pinging animation** with a 5-second progress bar. Data refreshes silently via React Query `refetch()` — no page reload.
+
+```typescript
+setPingingAnimation(type); // 'ping' | 'dns' | 'metrics'
+setTimeout(async () => {
+  if (type === 'ping') await refetchPing();
+  if (type === 'metrics') await refetchMetrics();
+  await refetchVM();
+  setPingingAnimation(null);
+}, 5000);
+```
+
+### Prefix Search with Metrics
+
+Search results are cross-referenced with dashboard data to show full resource metrics:
+
+```typescript
+const dashboardMap = new Map((allVms || []).map(vm => [vm.id, vm]));
+vms = searchResults.map((result) => {
+  const dashVm = dashboardMap.get(result.vm.id);
+  return dashVm ? { ...dashVm, ...result.vm } : result.vm;
+});
+```
+
 ### Auto-Refresh Dashboard
 
 ```typescript
 const { data: vms } = useQuery({
-  queryKey: ['vms'],
-  queryFn: fetchVMs,
+  queryKey: ['dashboard'],
+  queryFn: fetchDashboard,
   refetchInterval: 30000  // 30 seconds
 });
 ```
 
-### Form Validation
+### Backend Error Extraction
+
+The Axios interceptor extracts user-friendly error messages from API responses:
 
 ```typescript
-const vmSchema = z.object({
-  ip_address: z.string().ip(),
-  hostname: z.string().min(1).max(255),
-  ssh_port: z.number().min(1).max(65535),
-  tags: z.array(z.string()).max(20)
-});
-```
-
-### Markdown Rendering
-
-```typescript
-import ReactMarkdown from 'react-markdown';
-
-<ReactMarkdown>{deploymentNotes}</ReactMarkdown>
+// Instead of "Request failed with status code 400"
+// Users see: "VM with IP 10.208.x.x already registered"
+const backendMsg = error.response?.data?.error?.message
+  || error.response?.data?.detail;
+return Promise.reject(new Error(backendMsg || error.message));
 ```
 
 ## Next Steps
