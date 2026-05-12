@@ -773,31 +773,15 @@ function MetricsTab({
   metrics?: Metric[];
   isLoading: boolean;
 }) {
+  const [timeRange, setTimeRange] = useState<'1h' | '6h' | '24h' | '7d' | 'all'>('all');
+  const [chartMode, setChartMode] = useState<'individual' | 'combined'>('individual');
+  const [visibleMetrics, setVisibleMetrics] = useState({ cpu: true, ram: true, disk: true });
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <svg
-            className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-2"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <p className="text-gray-400 text-sm">Loading metrics...</p>
+      <div className="flex items-center justify-center py-20">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-t-2 border-brand-500 animate-spin" />
         </div>
       </div>
     );
@@ -805,120 +789,213 @@ function MetricsTab({
 
   if (!metrics || metrics.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-400">No metric data available</p>
+      <div className="glass-card p-16 text-center border border-white/5">
+        <svg className="w-10 h-10 text-gray-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+        <p className="text-gray-400 text-sm">No metric data available</p>
+        <p className="text-gray-600 text-xs mt-1">Trigger a metrics collection to start tracking</p>
       </div>
     );
   }
 
-  // Prepare chart data (reverse to show oldest to newest)
-  const chartData = [...metrics]
-    .reverse()
-    .filter((m) => m.collection_success)
-    .map((metric) => ({
-      timestamp: format(new Date(metric.timestamp), "HH:mm"),
-      cpu: metric.cpu_usage_percent || 0,
-      ram:
-        metric.ram_used_mb && metric.ram_total_mb
-          ? ((metric.ram_used_mb / metric.ram_total_mb) * 100).toFixed(1)
-          : 0,
-      disk: metric.disk_usage_percent || 0,
-    }));
+  // Time range filtering
+  const now = new Date();
+  const rangeMs: Record<string, number> = {
+    '1h': 3600000,
+    '6h': 21600000,
+    '24h': 86400000,
+    '7d': 604800000,
+    'all': Infinity,
+  };
+  const cutoff = timeRange === 'all' ? 0 : now.getTime() - rangeMs[timeRange];
+  const filtered = [...metrics]
+    .filter(m => m.collection_success && new Date(m.timestamp).getTime() >= cutoff)
+    .reverse();
+
+  const chartData = filtered.map((m) => ({
+    timestamp: format(new Date(m.timestamp), filtered.length > 48 ? "MMM d HH:mm" : "HH:mm"),
+    fullTime: format(new Date(m.timestamp), "MMM d, yyyy HH:mm:ss"),
+    cpu: parseFloat((m.cpu_usage_percent || 0).toFixed(1)),
+    ram: m.ram_used_mb && m.ram_total_mb ? parseFloat(((m.ram_used_mb / m.ram_total_mb) * 100).toFixed(1)) : 0,
+    disk: parseFloat((m.disk_usage_percent || 0).toFixed(1)),
+    ram_used_mb: m.ram_used_mb || 0,
+    ram_total_mb: m.ram_total_mb || 0,
+    disk_used_gb: m.disk_used_gb || 0,
+    disk_total_gb: m.disk_total_gb || 0,
+  }));
+
+  // Stats calculation
+  const calcStats = (key: 'cpu' | 'ram' | 'disk') => {
+    const vals = chartData.map(d => d[key]).filter(v => v > 0);
+    if (vals.length === 0) return { current: 0, min: 0, max: 0, avg: 0 };
+    return {
+      current: vals[vals.length - 1],
+      min: Math.min(...vals),
+      max: Math.max(...vals),
+      avg: parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)),
+    };
+  };
+  const cpuStats = calcStats('cpu');
+  const ramStats = calcStats('ram');
+  const diskStats = calcStats('disk');
+
+  const tooltipStyle = {
+    backgroundColor: 'rgba(17,24,39,0.95)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '0.75rem',
+    backdropFilter: 'blur(12px)',
+    padding: '12px 16px',
+  };
+
+  const chartConfigs = [
+    { key: 'cpu' as const, label: 'CPU', color: '#3b82f6', bgColor: 'blue', stats: cpuStats, unit: '%' },
+    { key: 'ram' as const, label: 'Memory', color: '#10b981', bgColor: 'emerald', stats: ramStats, unit: '%' },
+    { key: 'disk' as const, label: 'Disk', color: '#8b5cf6', bgColor: 'violet', stats: diskStats, unit: '%' },
+  ];
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0]?.payload;
+    return (
+      <div style={tooltipStyle} className="shadow-2xl">
+        <p className="text-[10px] text-gray-400 font-mono mb-2">{data?.fullTime || label}</p>
+        {payload.map((p: any, i: number) => (
+          <div key={i} className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+            <span className="text-xs text-gray-300">{p.name}:</span>
+            <span className="text-xs font-bold font-mono text-white">{p.value}%</span>
+          </div>
+        ))}
+        {data?.ram_used_mb > 0 && payload.some((p: any) => p.dataKey === 'ram') && (
+          <p className="text-[10px] text-gray-500 mt-1 border-t border-white/5 pt-1">{data.ram_used_mb.toLocaleString()} / {data.ram_total_mb.toLocaleString()} MB</p>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-8">
-      {/* CPU Usage Chart */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">
-          CPU Usage Over Time
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="timestamp" stroke="#9CA3AF" />
-            <YAxis stroke="#9CA3AF" domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
-                borderRadius: "0.5rem",
-              }}
-              labelStyle={{ color: "#F3F4F6" }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="cpu"
-              stroke="#3B82F6"
-              strokeWidth={2}
-              name="CPU %"
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+    <div className="space-y-5 animate-fade-in">
+      {/* Controls Bar */}
+      <div className="glass-card p-4 border border-white/5 flex flex-wrap items-center justify-between gap-4">
+        {/* Time Range */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mr-2">Range</span>
+          {(['1h', '6h', '24h', '7d', 'all'] as const).map(r => (
+            <button key={r} onClick={() => setTimeRange(r)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === r ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+              {r === 'all' ? 'All' : r.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        {/* Chart Mode */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mr-2">View</span>
+          <button onClick={() => setChartMode('individual')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${chartMode === 'individual' ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+            Individual
+          </button>
+          <button onClick={() => setChartMode('combined')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${chartMode === 'combined' ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+            Combined
+          </button>
+        </div>
+        {/* Data points */}
+        <span className="text-[10px] text-gray-600 font-mono">{chartData.length} data points</span>
       </div>
 
-      {/* RAM Usage Chart */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">
-          RAM Usage Over Time
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="timestamp" stroke="#9CA3AF" />
-            <YAxis stroke="#9CA3AF" domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
-                borderRadius: "0.5rem",
-              }}
-              labelStyle={{ color: "#F3F4F6" }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="ram"
-              stroke="#10B981"
-              strokeWidth={2}
-              name="RAM %"
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      {/* Stats Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        {chartConfigs.map(cfg => (
+          <div key={cfg.key} className="glass-card p-4 border border-white/5">
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-[10px] font-bold text-${cfg.bgColor}-400 uppercase tracking-wider`}>{cfg.label}</span>
+              <span className={`text-lg font-black font-mono text-${cfg.bgColor}-400`}>{cfg.stats.current}%</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[9px] text-gray-600 uppercase">Min</p>
+                <p className="text-xs font-mono font-bold text-gray-400">{cfg.stats.min}%</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-gray-600 uppercase">Avg</p>
+                <p className="text-xs font-mono font-bold text-white">{cfg.stats.avg}%</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-gray-600 uppercase">Max</p>
+                <p className={`text-xs font-mono font-bold ${cfg.stats.max >= 90 ? 'text-red-400' : 'text-gray-400'}`}>{cfg.stats.max}%</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Disk Usage Chart */}
-      <div>
-        <h3 className="text-lg font-semibold text-white mb-4">
-          Disk Usage Over Time
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="timestamp" stroke="#9CA3AF" />
-            <YAxis stroke="#9CA3AF" domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1F2937",
-                border: "1px solid #374151",
-                borderRadius: "0.5rem",
-              }}
-              labelStyle={{ color: "#F3F4F6" }}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="disk"
-              stroke="#8B5CF6"
-              strokeWidth={2}
-              name="Disk %"
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Charts */}
+      {chartMode === 'combined' ? (
+        <div className="glass-card p-6 border border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider">All Resources</h3>
+            <div className="flex gap-3">
+              {chartConfigs.map(cfg => (
+                <button key={cfg.key} onClick={() => setVisibleMetrics(prev => ({ ...prev, [cfg.key]: !prev[cfg.key] }))}
+                  className={`flex items-center gap-1.5 text-[10px] font-bold transition-all ${visibleMetrics[cfg.key] ? `text-${cfg.bgColor}-400` : 'text-gray-600 line-through'}`}>
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: visibleMetrics[cfg.key] ? cfg.color : '#4b5563' }} />
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+              <defs>
+                {chartConfigs.map(cfg => (
+                  <linearGradient key={cfg.key} id={`grad-${cfg.key}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={cfg.color} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={cfg.color} stopOpacity={0} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="timestamp" stroke="#4b5563" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis stroke="#4b5563" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+              <Tooltip content={<CustomTooltip />} />
+              {chartConfigs.map(cfg => visibleMetrics[cfg.key] && (
+                <Line key={cfg.key} type="monotone" dataKey={cfg.key} stroke={cfg.color} strokeWidth={2} name={cfg.label} dot={false} activeDot={{ r: 4, stroke: cfg.color, strokeWidth: 2, fill: '#111827' }} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {chartConfigs.map(cfg => (
+            <div key={cfg.key} className="glass-card border border-white/5 overflow-hidden">
+              <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }} />
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">{cfg.label} Usage</h3>
+                </div>
+                <span className={`text-sm font-black font-mono text-${cfg.bgColor}-400`}>{cfg.stats.current}%</span>
+              </div>
+              <div className="p-4">
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id={`area-${cfg.key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={cfg.color} stopOpacity={0.15} />
+                        <stop offset="100%" stopColor={cfg.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="timestamp" stroke="#4b5563" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                    <YAxis stroke="#4b5563" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} width={40} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line type="monotone" dataKey={cfg.key} stroke={cfg.color} strokeWidth={2} name={cfg.label} dot={false}
+                      activeDot={{ r: 4, stroke: cfg.color, strokeWidth: 2, fill: '#111827' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
