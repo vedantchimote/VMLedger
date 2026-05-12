@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow, format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { api } from "@/lib/api-client";
 import {
   LineChart,
   Line,
@@ -17,7 +18,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useAuth } from "@/lib/hooks/use-auth";
-import { useVM } from "@/lib/hooks/use-vms";
+import { useVM, useVMSpecs } from "@/lib/hooks/use-vms";
 import { useVMMetrics, useVMPingHistory } from "@/lib/hooks/use-monitoring";
 import {
   useAlertConfig,
@@ -31,7 +32,8 @@ import {
   isValidCooldownPeriod,
 } from "@/lib/validation";
 
-type TabType = "overview" | "metrics" | "ping" | "notes" | "alerts";
+type TabType = "overview" | "specs" | "metrics" | "ping" | "notes" | "alerts";
+type TriggerType = "ping" | "dns" | "metrics";
 
 export default function VMDetailsPage() {
   const router = useRouter();
@@ -39,6 +41,14 @@ export default function VMDetailsPage() {
   const vmId = parseInt(params.id as string, 10);
   const { isAuthenticated, isMounted } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+
+  // Manual trigger states
+  const [triggerLoading, setTriggerLoading] = useState<Record<TriggerType, boolean>>({
+    ping: false,
+    dns: false,
+    metrics: false,
+  });
+  const [triggerFeedback, setTriggerFeedback] = useState<{ type: TriggerType; message: string; success: boolean } | null>(null);
 
   // Fetch VM data
   const { data: vm, isLoading: vmLoading, isError: vmError } = useVM(vmId);
@@ -57,6 +67,53 @@ export default function VMDetailsPage() {
       router.push("/login");
     }
   }, [isAuthenticated, isMounted, router]);
+
+  // Clear trigger feedback after 4 seconds
+  useEffect(() => {
+    if (triggerFeedback) {
+      const timer = setTimeout(() => setTriggerFeedback(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [triggerFeedback]);
+
+  const handleTrigger = useCallback(async (type: TriggerType) => {
+    setTriggerLoading((prev) => ({ ...prev, [type]: true }));
+    setTriggerFeedback(null);
+    try {
+      let result;
+      switch (type) {
+        case "ping":
+          result = await api.triggers.triggerPing(vmId);
+          break;
+        case "dns":
+          result = await api.triggers.triggerDnsCheck(vmId);
+          break;
+        case "metrics":
+          result = await api.triggers.triggerCollectMetrics(vmId);
+          break;
+      }
+      const labels: Record<TriggerType, string> = {
+        ping: "Ping check",
+        dns: "DNS resolution",
+        metrics: "Metrics collection",
+      };
+      setTriggerFeedback({
+        type,
+        message: `${labels[type]} dispatched — results will appear shortly.`,
+        success: true,
+      });
+      // Auto-refresh the page data after a delay to pick up results
+      setTimeout(() => window.location.reload(), 6000);
+    } catch (err: any) {
+      setTriggerFeedback({
+        type,
+        message: err?.message || "Failed to trigger task",
+        success: false,
+      });
+    } finally {
+      setTriggerLoading((prev) => ({ ...prev, [type]: false }));
+    }
+  }, [vmId]);
 
   if (!isMounted || !isAuthenticated) {
     return (
@@ -198,7 +255,47 @@ export default function VMDetailsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleTrigger("ping")}
+                disabled={triggerLoading.ping}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 hover:border-brand-500/30 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Run an immediate connectivity check"
+              >
+                {triggerLoading.ping ? (
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                )}
+                Ping Now
+              </button>
+              <button
+                onClick={() => handleTrigger("dns")}
+                disabled={triggerLoading.dns}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/30 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Resolve hostname and compare with registered IP"
+              >
+                {triggerLoading.dns ? (
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                )}
+                DNS Check
+              </button>
+              <button
+                onClick={() => handleTrigger("metrics")}
+                disabled={triggerLoading.metrics}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Collect CPU, RAM, and Disk usage via SSH"
+              >
+                {triggerLoading.metrics ? (
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                )}
+                Collect Metrics
+              </button>
+              <div className="w-px h-8 bg-white/10"></div>
               <Link href={`/vms/${vm.id}/edit`} className="btn-secondary flex items-center gap-2">
                 <svg
                   className="w-4 h-4"
@@ -208,12 +305,36 @@ export default function VMDetailsPage() {
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
-                Edit Configuration
+                Edit
               </Link>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Trigger Feedback Toast */}
+      {triggerFeedback && (
+        <div className={`fixed top-24 right-6 z-50 max-w-sm animate-fade-in px-5 py-4 rounded-xl border shadow-2xl backdrop-blur-xl ${
+          triggerFeedback.success
+            ? "bg-brand-500/10 border-brand-500/20 text-brand-400"
+            : "bg-red-500/10 border-red-500/20 text-red-400"
+        }`}>
+          <div className="flex items-center gap-3">
+            {triggerFeedback.success ? (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            ) : (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            )}
+            <p className="text-sm font-medium">{triggerFeedback.message}</p>
+            <button onClick={() => setTriggerFeedback(null)} className="ml-auto text-current opacity-60 hover:opacity-100">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          {triggerFeedback.success && (
+            <p className="text-[10px] text-current opacity-60 mt-1 ml-8 uppercase tracking-wider">Page will auto-refresh in 6s</p>
+          )}
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
@@ -385,7 +506,7 @@ export default function VMDetailsPage() {
           {/* Tab Headers */}
           <div className="border-b border-white/5 bg-surface-900/50">
             <nav className="flex overflow-x-auto hide-scrollbar">
-              {["overview", "metrics", "ping", "notes", "alerts"].map((tab) => (
+              {["overview", "specs", "metrics", "ping", "notes", "alerts"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as TabType)}
@@ -409,6 +530,9 @@ export default function VMDetailsPage() {
                 metrics={metrics}
                 pingHistory={pingHistory}
               />
+            )}
+            {activeTab === "specs" && (
+              <SpecsTab vmId={vmId} />
             )}
             {activeTab === "metrics" && (
               <MetricsTab metrics={metrics} isLoading={metricsLoading} />
@@ -972,7 +1096,7 @@ function AlertsTab({
   isHistoryLoading,
 }: {
   vmId: number;
-  alertConfig?: AlertConfig;
+  alertConfig?: AlertConfig | null;
   alertHistory?: Alert[];
   isConfigLoading: boolean;
   isHistoryLoading: boolean;
@@ -1386,6 +1510,106 @@ function AlertsTab({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Specs Tab Component
+function SpecsTab({ vmId }: { vmId: number }) {
+  const { data: specs, isLoading, isError, error, refetch } = useVMSpecs(vmId);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <svg className="animate-spin w-10 h-10 mb-4 text-brand-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <p className="text-sm font-semibold tracking-wide">Fetching live specs via SSH...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
+        <div className="flex items-center gap-3 text-red-400 mb-2">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <h3 className="font-bold">Failed to load specs</h3>
+        </div>
+        <p className="text-sm text-red-300 ml-8 mb-4">{error instanceof Error ? error.message : "Unknown error occurred"}</p>
+        <button onClick={() => refetch()} className="ml-8 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-lg transition-colors text-sm font-semibold">Retry</button>
+      </div>
+    );
+  }
+
+  if (!specs) return null;
+
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">OS</p>
+          <p className="text-white font-bold">{specs.os_name}</p>
+          <p className="text-xs text-gray-400 mt-1 font-mono">{specs.kernel}</p>
+        </div>
+        <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">CPU</p>
+          <p className="text-white font-bold">{specs.cpu_cores} Cores</p>
+          <p className="text-xs text-gray-400 mt-1 font-mono">{specs.cpu_model}</p>
+        </div>
+        <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Total RAM</p>
+          <p className="text-white font-bold">{specs.ram_total_gb} GB</p>
+        </div>
+        <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">System Type</p>
+          <p className="text-white font-bold">{specs.os_type}</p>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Storage Partitions</h3>
+        {specs.partitions && specs.partitions.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-white/5">
+            <table className="w-full text-left text-sm text-gray-300">
+              <thead className="text-[10px] uppercase tracking-wider bg-surface-800 text-gray-400 border-b border-white/5">
+                <tr>
+                  <th className="px-6 py-4 font-bold">Filesystem</th>
+                  <th className="px-6 py-4 font-bold">Mounted On</th>
+                  <th className="px-6 py-4 font-bold text-right">Size</th>
+                  <th className="px-6 py-4 font-bold text-right">Used</th>
+                  <th className="px-6 py-4 font-bold text-right">Avail</th>
+                  <th className="px-6 py-4 font-bold text-right">Usage</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 bg-surface-900/30">
+                {specs.partitions.map((part: any, idx: number) => (
+                  <tr key={idx} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 font-mono text-xs">{part.filesystem}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-brand-300">{part.mounted_on}</td>
+                    <td className="px-6 py-4 text-right">{part.size}</td>
+                    <td className="px-6 py-4 text-right text-gray-400">{part.used}</td>
+                    <td className="px-6 py-4 text-right text-gray-400">{part.avail}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="text-xs font-mono">{part.use_percent}</span>
+                        <div className="w-16 bg-surface-800 rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-700 ease-out ${parseInt(part.use_percent) > 85 ? "bg-red-500" : parseInt(part.use_percent) > 65 ? "bg-yellow-500" : "bg-brand-500"}`} 
+                            style={{ width: part.use_percent }}
+                          ></div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center bg-surface-900/30 rounded-xl border border-white/5">
+            <p className="text-gray-500 text-sm">No partition data available.</p>
           </div>
         )}
       </div>
