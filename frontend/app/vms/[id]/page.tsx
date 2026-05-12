@@ -51,12 +51,13 @@ export default function VMDetailsPage() {
   const [triggerFeedback, setTriggerFeedback] = useState<{ type: TriggerType; message: string; success: boolean } | null>(null);
 
   // Fetch VM data
-  const { data: vm, isLoading: vmLoading, isError: vmError } = useVM(vmId);
-  const { data: metrics, isLoading: metricsLoading } = useVMMetrics(vmId, 100);
-  const { data: pingHistory, isLoading: pingLoading } = useVMPingHistory(
+  const { data: vm, isLoading: vmLoading, isError: vmError, refetch: refetchVM } = useVM(vmId);
+  const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useVMMetrics(vmId, 100);
+  const { data: pingHistory, isLoading: pingLoading, refetch: refetchPing } = useVMPingHistory(
     vmId,
     100,
   );
+  const [pingingAnimation, setPingingAnimation] = useState<TriggerType | null>(null);
   const { data: alertConfig, isLoading: alertConfigLoading } =
     useAlertConfig(vmId);
   const { data: alertHistory, isLoading: alertHistoryLoading } =
@@ -99,11 +100,21 @@ export default function VMDetailsPage() {
       };
       setTriggerFeedback({
         type,
-        message: `${labels[type]} dispatched — results will appear shortly.`,
+        message: `${labels[type]} dispatched — refreshing data...`,
         success: true,
       });
-      // Auto-refresh the page data after a delay to pick up results
-      setTimeout(() => window.location.reload(), 6000);
+      // Show pinging animation while waiting for backend to process
+      setPingingAnimation(type);
+      // Silently refetch data after a delay instead of full page reload
+      setTimeout(async () => {
+        try {
+          if (type === 'ping') await refetchPing();
+          if (type === 'metrics') await refetchMetrics();
+          await refetchVM();
+        } finally {
+          setPingingAnimation(null);
+        }
+      }, 5000);
     } catch (err: any) {
       setTriggerFeedback({
         type,
@@ -113,7 +124,7 @@ export default function VMDetailsPage() {
     } finally {
       setTriggerLoading((prev) => ({ ...prev, [type]: false }));
     }
-  }, [vmId]);
+  }, [vmId, refetchPing, refetchMetrics, refetchVM]);
 
   if (!isMounted || !isAuthenticated) {
     return (
@@ -312,8 +323,32 @@ export default function VMDetailsPage() {
         </div>
       </header>
 
+      {/* Pinging Animation Overlay */}
+      {pingingAnimation && (
+        <div className="fixed top-24 right-6 z-50 max-w-xs animate-fade-in">
+          <div className="glass-card px-5 py-4 border border-brand-500/30 shadow-2xl shadow-brand-500/10">
+            <div className="flex items-center gap-4">
+              <div className="relative flex items-center justify-center w-10 h-10">
+                <span className="absolute inline-flex w-full h-full rounded-full bg-brand-400/30 animate-ping" />
+                <span className="absolute inline-flex w-6 h-6 rounded-full bg-brand-400/50 animate-ping" style={{ animationDelay: '0.3s' }} />
+                <span className="relative inline-flex w-3 h-3 rounded-full bg-brand-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">
+                  {pingingAnimation === 'ping' ? 'Pinging...' : pingingAnimation === 'dns' ? 'Resolving DNS...' : 'Collecting Metrics...'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Waiting for results — data will update automatically</p>
+              </div>
+            </div>
+            <div className="mt-3 w-full bg-surface-800 rounded-full h-1 overflow-hidden">
+              <div className="h-full bg-brand-500 rounded-full animate-progress-bar" style={{ animation: 'progressBar 5s linear forwards' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Trigger Feedback Toast */}
-      {triggerFeedback && (
+      {triggerFeedback && !pingingAnimation && (
         <div className={`fixed top-24 right-6 z-50 max-w-sm animate-fade-in px-5 py-4 rounded-xl border shadow-2xl backdrop-blur-xl ${
           triggerFeedback.success
             ? "bg-brand-500/10 border-brand-500/20 text-brand-400"
@@ -330,9 +365,6 @@ export default function VMDetailsPage() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-          {triggerFeedback.success && (
-            <p className="text-[10px] text-current opacity-60 mt-1 ml-8 uppercase tracking-wider">Page will auto-refresh in 6s</p>
-          )}
         </div>
       )}
 
