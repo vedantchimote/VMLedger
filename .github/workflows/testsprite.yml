@@ -1,0 +1,27 @@
+name: TestSprite CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  testsprite:
+    name: Run TestSprite Autonomous Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # TestSprite action autonomously explores your application, 
+      # runs tests based on your specs, and reports directly to your PR.
+      - name: Run TestSprite
+        uses: testsprite/testsprite-action@v1
+        with:
+          # You need to configure this secret in your GitHub repository:
+          # Settings > Secrets and variables > Actions > New repository secret
+          api-key: ${{ secrets.TESTSPRITE_API_KEY }}
+          
+          # Optional: point TestSprite to your specific environment or build commands
+          # environment-url: "http://localhost:3000" (if starting up app in CI)
