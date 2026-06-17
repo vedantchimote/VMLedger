@@ -140,6 +140,8 @@ class VMRegistryService:
                 ssh_port=vm_data.ssh_port,
                 tags=self._serialize_tags(vm_data.tags if vm_data.tags else []),
                 deployment_notes=vm_data.deployment_notes,
+                ping_interval_minutes=vm_data.ping_interval_minutes,
+                dns_interval_hours=vm_data.dns_interval_hours,
                 is_reachable=None  # Unknown until first ping
             )
             
@@ -397,6 +399,10 @@ class VMRegistryService:
                 vm.tags = self._serialize_tags(updates.tags)
             if updates.deployment_notes is not None:
                 vm.deployment_notes = updates.deployment_notes
+            if updates.ping_interval_minutes is not None:
+                vm.ping_interval_minutes = updates.ping_interval_minutes
+            if updates.dns_interval_hours is not None:
+                vm.dns_interval_hours = updates.dns_interval_hours
             
             # Update credentials if provided
             if updates.ssh_private_key or updates.ssh_password or updates.ssh_username:

@@ -433,6 +433,72 @@ async def create_vm(
 
 
 @router.get(
+    "/alerts",
+    status_code=status.HTTP_200_OK,
+    summary="Get global alert history",
+    description="Get alert notification history for all VMs owned by the user"
+)
+async def get_global_alerts(
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=1000, description="Maximum number of results"),
+    db: Session = Depends(get_db)
+) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", "unknown")
+    try:
+        user_id = get_user_id(request)
+        
+        from vmledger.models.alert import Alert
+        from vmledger.models.vm import VM
+        alerts = (
+            db.query(Alert, VM)
+            .join(VM, Alert.vm_id == VM.id)
+            .filter(VM.user_id == user_id)
+            .order_by(Alert.sent_at.desc())
+            .limit(limit)
+            .all()
+        )
+        
+        alerts_data = [
+            {
+                "id": alert.id,
+                "vm_id": alert.vm_id,
+                "hostname": vm.hostname,
+                "alert_type": alert.alert_type,
+                "sent_at": alert.sent_at.isoformat() if alert.sent_at else None,
+                "notification_method": alert.notification_method,
+                "success": alert.success,
+                "error_message": alert.error_message
+            }
+            for alert, vm in alerts
+        ]
+        
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "data": {
+                    "alerts": alerts_data,
+                    "count": len(alerts_data)
+                },
+                "request_id": request_id
+            }
+        )
+    except Exception as e:
+        logger.error(f"Global alert history error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "Failed to retrieve global alerts."
+                },
+                "request_id": request_id
+            }
+        )
+
+
+@router.get(
     "/{vm_id}",
     response_model=VMResponseSchema,
     status_code=status.HTTP_200_OK,
@@ -2654,4 +2720,3 @@ async def trigger_collect_metrics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"success": False, "message": "Failed to trigger metrics collection"}
         )
-

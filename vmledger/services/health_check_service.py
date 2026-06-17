@@ -242,9 +242,27 @@ class HealthCheckService:
             # Update VM status
             vm = self.db.query(VM).filter(VM.id == vm_id).first()
             if vm:
-                vm.is_reachable = result.success
                 if result.success:
+                    vm.is_reachable = True
                     vm.last_seen = datetime.utcnow()
+                else:
+                    # Check the last 2 ping results (prior to the one we just added)
+                    # To see if we have reached 3 consecutive failures
+                    recent_pings = (
+                        self.db.query(PingResult)
+                        .filter(PingResult.vm_id == vm_id)
+                        .order_by(PingResult.timestamp.desc())
+                        .offset(1)  # Skip the one we just added
+                        .limit(2)   # Look at the 2 before that
+                        .all()
+                    )
+                    
+                    # If we have at least 2 previous pings AND they both failed, mark offline
+                    if len(recent_pings) == 2 and all(not p.success for p in recent_pings):
+                        vm.is_reachable = False
+                    # If there are no previous pings (brand new VM), mark it offline immediately
+                    elif len(recent_pings) == 0:
+                        vm.is_reachable = False
             
             self.db.commit()
             

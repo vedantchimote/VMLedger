@@ -74,6 +74,8 @@ export interface VM {
   resolved_ip?: string;
   dns_last_checked?: string;
   dns_mismatch?: boolean;
+  ping_interval_minutes?: number;
+  dns_interval_hours?: number;
 }
 
 export interface VMCreateRequest {
@@ -86,6 +88,8 @@ export interface VMCreateRequest {
   ssh_username?: string;
   ssh_private_key?: string;
   ssh_password?: string;
+  ping_interval_minutes?: number;
+  dns_interval_hours?: number;
 }
 
 export interface VMUpdateRequest {
@@ -98,6 +102,8 @@ export interface VMUpdateRequest {
   ssh_username?: string;
   ssh_private_key?: string;
   ssh_password?: string;
+  ping_interval_minutes?: number;
+  dns_interval_hours?: number;
 }
 
 // Metric Types

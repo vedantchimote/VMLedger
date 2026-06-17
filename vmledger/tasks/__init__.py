@@ -89,6 +89,10 @@ def ping_check_task(self, vm_id: int):
                     }
                     alert_handler.send_alert(vm, alert_type, error_info)
             
+            # Update ping_last_checked
+            vm.ping_last_checked = datetime.utcnow()
+            db.commit()
+            
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             logger.info(
                 f"Completed ping check task for VM {vm_id} in {elapsed:.2f}s: "
@@ -198,9 +202,19 @@ def schedule_ping_checks():
     
     try:
         with get_db_context() as db:
-            # Query all VMs (no filtering by is_reachable - check all VMs)
-            vms = db.query(VM).all()
-            vm_count = len(vms)
+            # Filter VMs based on their custom ping_interval_minutes
+            now = datetime.utcnow()
+            vms_to_ping = []
+            
+            for vm in db.query(VM).all():
+                if not vm.ping_last_checked:
+                    vms_to_ping.append(vm)
+                else:
+                    elapsed_minutes = (now - vm.ping_last_checked.replace(tzinfo=None)).total_seconds() / 60
+                    if elapsed_minutes >= (vm.ping_interval_minutes or 5):
+                        vms_to_ping.append(vm)
+            
+            vm_count = len(vms_to_ping)
             
             if vm_count == 0:
                 logger.info("No VMs found to ping")
@@ -215,7 +229,7 @@ def schedule_ping_checks():
             # Create group of ping check tasks for concurrent execution
             # Celery will distribute these across available workers
             job = group(
-                ping_check_task.s(vm.id) for vm in vms
+                ping_check_task.s(vm.id) for vm in vms_to_ping
             )
             
             # Dispatch all tasks
@@ -410,6 +424,15 @@ def dns_resolve_task(self, vm_id: int):
                             f"DNS mismatch for VM {vm_id} ({hostname}): "
                             f"stored={stored_ip}, resolved={resolved_ip}"
                         )
+                        
+                        # Trigger DNS drift alert
+                        alert_handler = AlertHandlerService(db)
+                        error_info = {
+                            'error_type': 'DNS Drift Detected',
+                            'stored_ip': stored_ip,
+                            'resolved_ip': resolved_ip
+                        }
+                        alert_handler.send_alert(vm, alert_handler.ALERT_DNS_DRIFT, error_info)
                     else:
                         logger.info(
                             f"DNS resolved for VM {vm_id} ({hostname}): "
@@ -471,8 +494,19 @@ def schedule_dns_resolution():
     
     try:
         with get_db_context() as db:
-            vms = db.query(VM).all()
-            vm_count = len(vms)
+            # Filter VMs based on their custom dns_interval_hours
+            now = datetime.utcnow()
+            vms_to_resolve = []
+            
+            for vm in db.query(VM).all():
+                if not vm.dns_last_checked:
+                    vms_to_resolve.append(vm)
+                else:
+                    elapsed_hours = (now - vm.dns_last_checked.replace(tzinfo=None)).total_seconds() / 3600
+                    if elapsed_hours >= (vm.dns_interval_hours or 6):
+                        vms_to_resolve.append(vm)
+            
+            vm_count = len(vms_to_resolve)
             
             if vm_count == 0:
                 logger.info("No VMs found for DNS resolution")
@@ -485,7 +519,7 @@ def schedule_dns_resolution():
             logger.info(f"Scheduling DNS resolution for {vm_count} VMs")
             
             job = group(
-                dns_resolve_task.s(vm.id) for vm in vms
+                dns_resolve_task.s(vm.id) for vm in vms_to_resolve
             )
             
             result = job.apply_async()

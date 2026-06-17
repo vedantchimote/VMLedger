@@ -30,6 +30,8 @@ class VMCreateSchema(BaseModel):
     ssh_port: int = Field(default=22, ge=1, le=65535, description="SSH port number")
     tags: List[str] = Field(default_factory=list, max_length=20, description="List of tags (max 20)")
     deployment_notes: Optional[str] = Field(None, max_length=50000, description="Markdown deployment notes")
+    ping_interval_minutes: int = Field(default=5, ge=1, description="Ping check interval in minutes")
+    dns_interval_hours: int = Field(default=6, ge=1, description="DNS check interval in hours")
     
     # Credentials (one of these required)
     ssh_username: str = Field(default="root", description="SSH username")
@@ -86,6 +88,8 @@ class VMUpdateSchema(BaseModel):
     ssh_port: Optional[int] = Field(None, ge=1, le=65535, description="SSH port number")
     tags: Optional[List[str]] = Field(None, max_length=20, description="List of tags (max 20)")
     deployment_notes: Optional[str] = Field(None, max_length=50000, description="Markdown deployment notes")
+    ping_interval_minutes: Optional[int] = Field(None, ge=1, description="Ping check interval in minutes")
+    dns_interval_hours: Optional[int] = Field(None, ge=1, description="DNS check interval in hours")
     ssh_username: Optional[str] = Field(None, description="SSH username")
     ssh_private_key: Optional[str] = Field(None, description="SSH private key (PEM format)")
     ssh_password: Optional[str] = Field(None, description="SSH password")
@@ -141,6 +145,11 @@ class VMResponseSchema(BaseModel):
     resolved_ip: Optional[str] = None
     dns_last_checked: Optional[datetime] = None
     dns_mismatch: Optional[bool] = None
+    
+    # Custom monitoring intervals
+    ping_interval_minutes: int = 5
+    dns_interval_hours: int = 6
+    ping_last_checked: Optional[datetime] = None
     
     model_config = {
         "from_attributes": True

@@ -56,6 +56,11 @@ class VM(Base):
     dns_last_checked = Column(DateTime(timezone=True), nullable=True)  # When DNS was last checked
     dns_mismatch = Column(Boolean, nullable=True, default=False)  # True if resolved_ip != ip_address
     
+    # Custom monitoring intervals
+    ping_interval_minutes = Column(Integer, nullable=False, server_default='5', default=5)
+    dns_interval_hours = Column(Integer, nullable=False, server_default='6', default=6)
+    ping_last_checked = Column(DateTime(timezone=True), nullable=True)
+    
     # Constraints
     __table_args__ = (
         UniqueConstraint('user_id', 'ip_address', 'ssh_port', name='unique_vm_per_user'),

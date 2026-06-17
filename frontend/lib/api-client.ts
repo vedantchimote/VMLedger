@@ -401,6 +401,12 @@ export const api = {
       const data = response.data.data;
       return Array.isArray(data) ? data : data?.alerts || data?.history || [];
     },
+
+    async getGlobalHistory(): Promise<(Alert & { hostname?: string })[]> {
+      const response = await apiClient.get<ApiResponse<any>>("/vms/alerts");
+      const data = response.data.data;
+      return Array.isArray(data) ? data : data?.alerts || data?.history || [];
+    },
   },
 
   // Dashboard

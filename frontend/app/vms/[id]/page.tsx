@@ -31,6 +31,7 @@ import {
   isValidEmail,
   isValidCooldownPeriod,
 } from "@/lib/validation";
+import GlobalNotificationBell from "@/components/GlobalNotificationBell";
 
 type TabType = "overview" | "specs" | "metrics" | "ping" | "notes" | "alerts";
 type TriggerType = "ping" | "dns" | "metrics";
@@ -307,6 +308,7 @@ export default function VMDetailsPage() {
                 Collect Metrics
               </button>
               <div className="w-px h-8 bg-white/10"></div>
+              <GlobalNotificationBell />
               <Link href={`/vms/${vm.id}/edit`} className="btn-secondary flex items-center gap-2">
                 <svg
                   className="w-4 h-4"

@@ -30,6 +30,8 @@ export default function NewVMPage() {
     ssh_username: "root",
     ssh_private_key: "",
     ssh_password: "",
+    ping_interval_minutes: 5,
+    dns_interval_hours: 6,
   });
 
   const [authMethod, setAuthMethod] = useState<"ssh_key" | "password">(
@@ -104,6 +106,14 @@ export default function NewVMPage() {
       case "deployment_notes":
         if (stringValue && stringValue.length > 50000)
           return "Deployment notes must be max 50,000 characters";
+        return "";
+
+      case "ping_interval_minutes":
+        if (Number(value) < 1) return "Ping interval must be at least 1 minute";
+        return "";
+
+      case "dns_interval_hours":
+        if (Number(value) < 1) return "DNS interval must be at least 1 hour";
         return "";
 
       default:
@@ -204,6 +214,8 @@ export default function NewVMPage() {
       tags: formData.tags || [],
       deployment_notes: formData.deployment_notes || undefined,
       ssh_username: formData.ssh_username,
+      ping_interval_minutes: Number(formData.ping_interval_minutes),
+      dns_interval_hours: Number(formData.dns_interval_hours),
     };
 
     if (authMethod === "ssh_key") {
@@ -650,6 +662,66 @@ export default function NewVMPage() {
                 {errors.deployment_notes && touched.deployment_notes && (
                   <p className="mt-2 text-xs font-medium text-red-400">
                     {errors.deployment_notes}
+                  </p>
+                )}
+              </div>
+
+              {/* Ping Interval */}
+              <div>
+                <label
+                  htmlFor="ping_interval_minutes"
+                  className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide"
+                >
+                  Ping Check Interval (Minutes) <span className="text-brand-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  id="ping_interval_minutes"
+                  name="ping_interval_minutes"
+                  value={formData.ping_interval_minutes}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  min="1"
+                  className={`input-premium ${
+                    errors.ping_interval_minutes && touched.ping_interval_minutes
+                      ? "border-red-500/50 bg-red-500/5"
+                      : ""
+                  }`}
+                  placeholder="5"
+                />
+                {errors.ping_interval_minutes && touched.ping_interval_minutes && (
+                  <p className="mt-2 text-xs font-medium text-red-400">
+                    {errors.ping_interval_minutes}
+                  </p>
+                )}
+              </div>
+
+              {/* DNS Interval */}
+              <div>
+                <label
+                  htmlFor="dns_interval_hours"
+                  className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide"
+                >
+                  DNS Check Interval (Hours) <span className="text-brand-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  id="dns_interval_hours"
+                  name="dns_interval_hours"
+                  value={formData.dns_interval_hours}
+                  onChange={handleInputChange}
+                  onBlur={handleBlur}
+                  min="1"
+                  className={`input-premium ${
+                    errors.dns_interval_hours && touched.dns_interval_hours
+                      ? "border-red-500/50 bg-red-500/5"
+                      : ""
+                  }`}
+                  placeholder="6"
+                />
+                {errors.dns_interval_hours && touched.dns_interval_hours && (
+                  <p className="mt-2 text-xs font-medium text-red-400">
+                    {errors.dns_interval_hours}
                   </p>
                 )}
               </div>

@@ -56,6 +56,7 @@ class AlertHandlerService:
     ALERT_VM_UNREACHABLE = "VM_UNREACHABLE"
     ALERT_VM_RECOVERED = "VM_RECOVERED"
     ALERT_METRICS_UNAVAILABLE = "METRICS_UNAVAILABLE"
+    ALERT_DNS_DRIFT = "DNS_DRIFT"
     
     # Notification method constants
     METHOD_WEBHOOK = "webhook"
@@ -247,6 +248,8 @@ class AlertHandlerService:
             status = "RECOVERED"
         elif alert_type == self.ALERT_METRICS_UNAVAILABLE:
             status = "METRICS UNAVAILABLE"
+        elif alert_type == self.ALERT_DNS_DRIFT:
+            status = "DNS DRIFT DETECTED"
         else:
             status = "UNKNOWN"
         
@@ -511,6 +514,8 @@ class AlertHandlerService:
             subject = f"[VMLedger Alert] {vm.hostname} has RECOVERED"
         elif alert_type == self.ALERT_METRICS_UNAVAILABLE:
             subject = f"[VMLedger Alert] {vm.hostname} metrics UNAVAILABLE"
+        elif alert_type == self.ALERT_DNS_DRIFT:
+            subject = f"[VMLedger Alert] {vm.hostname} DNS drift detected"
         else:
             subject = f"[VMLedger Alert] {vm.hostname} status changed"
         

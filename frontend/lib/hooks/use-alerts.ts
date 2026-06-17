@@ -21,6 +21,7 @@ export function useAlertConfig(vmId: number) {
     queryKey: alertKeys.config(vmId),
     queryFn: () => api.alerts.getConfig(vmId),
     enabled: !!vmId,
+    retry: false,
   });
 }
 
@@ -32,6 +33,18 @@ export function useAlertHistory(vmId: number) {
     queryKey: alertKeys.history(vmId),
     queryFn: () => api.alerts.getHistory(vmId),
     enabled: !!vmId,
+    retry: false,
+  });
+}
+
+/**
+ * Hook to fetch global alert history across all VMs
+ */
+export function useGlobalAlertHistory() {
+  return useQuery({
+    queryKey: [...alertKeys.all, 'global-history'],
+    queryFn: () => api.alerts.getGlobalHistory(),
+    refetchInterval: 30000, // refresh every 30s
   });
 }
 

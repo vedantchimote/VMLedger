@@ -9,6 +9,7 @@ import { useDashboard } from "@/lib/hooks/use-dashboard";
 import { useVMSearch, useDeleteVM } from "@/lib/hooks/use-vms";
 import type { VM } from "@/types/api";
 import { KanbanCard } from "./KanbanCard";
+import GlobalNotificationBell from "@/components/GlobalNotificationBell";
 
 // Custom hook for debounced value
 function useDebounce<T>(value: T, delay: number): T {
@@ -251,6 +252,7 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="flex items-center gap-4">
+              <GlobalNotificationBell />
               {selectedVms.length > 0 && (
                 <button
                   onClick={handleBulkDelete}

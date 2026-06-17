@@ -37,6 +37,8 @@ export default function EditVMPage() {
     ssh_username: "root",
     ssh_private_key: "",
     ssh_password: "",
+    ping_interval_minutes: 5,
+    dns_interval_hours: 6,
   });
 
   const [authMethod, setAuthMethod] = useState<"ssh_key" | "password" | "none">(
@@ -66,6 +68,8 @@ export default function EditVMPage() {
         tags: vm.tags || [],
         deployment_notes: vm.deployment_notes || "",
         ssh_username: "root", // Default, will be updated if needed
+        ping_interval_minutes: vm.ping_interval_minutes || 5,
+        dns_interval_hours: vm.dns_interval_hours || 6,
       });
       // Initialize last saved notes
       lastSavedNotesRef.current = vm.deployment_notes || "";
@@ -215,6 +219,14 @@ export default function EditVMPage() {
           return "Deployment notes must be max 50,000 characters";
         return "";
 
+      case "ping_interval_minutes":
+        if (Number(value) < 1) return "Ping interval must be at least 1 minute";
+        return "";
+
+      case "dns_interval_hours":
+        if (Number(value) < 1) return "DNS interval must be at least 1 hour";
+        return "";
+
       default:
         return "";
     }
@@ -319,6 +331,8 @@ export default function EditVMPage() {
       ssh_port: Number(formData.ssh_port),
       tags: formData.tags || [],
       deployment_notes: formData.deployment_notes || undefined,
+      ping_interval_minutes: Number(formData.ping_interval_minutes),
+      dns_interval_hours: Number(formData.dns_interval_hours),
     };
 
     // Only include credentials if updating them
@@ -543,6 +557,69 @@ export default function EditVMPage() {
                   {errors.ssh_port && touched.ssh_port && (
                     <p className="mt-2 text-xs font-medium text-red-400">
                       {errors.ssh_port}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Interval Settings */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {/* Ping Interval */}
+                <div>
+                  <label
+                    htmlFor="ping_interval_minutes"
+                    className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide"
+                  >
+                    Ping Check Interval (Minutes) <span className="text-brand-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="ping_interval_minutes"
+                    name="ping_interval_minutes"
+                    value={formData.ping_interval_minutes}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    min="1"
+                    className={`input-premium ${
+                      errors.ping_interval_minutes && touched.ping_interval_minutes
+                        ? "border-red-500/50 bg-red-500/5"
+                        : ""
+                    }`}
+                    placeholder="5"
+                  />
+                  {errors.ping_interval_minutes && touched.ping_interval_minutes && (
+                    <p className="mt-2 text-xs font-medium text-red-400">
+                      {errors.ping_interval_minutes}
+                    </p>
+                  )}
+                </div>
+
+                {/* DNS Interval */}
+                <div>
+                  <label
+                    htmlFor="dns_interval_hours"
+                    className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide"
+                  >
+                    DNS Check Interval (Hours) <span className="text-brand-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="dns_interval_hours"
+                    name="dns_interval_hours"
+                    value={formData.dns_interval_hours}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    min="1"
+                    className={`input-premium ${
+                      errors.dns_interval_hours && touched.dns_interval_hours
+                        ? "border-red-500/50 bg-red-500/5"
+                        : ""
+                    }`}
+                    placeholder="6"
+                  />
+                  {errors.dns_interval_hours && touched.dns_interval_hours && (
+                    <p className="mt-2 text-xs font-medium text-red-400">
+                      {errors.dns_interval_hours}
                     </p>
                   )}
                 </div>

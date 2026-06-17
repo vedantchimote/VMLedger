@@ -60,9 +60,9 @@ celery_app.conf.update(
 celery_app.conf.beat_schedule = {
     "ping-all-vms": {
         "task": "vmledger.tasks.schedule_ping_checks",
-        "schedule": float(settings.ping_interval_seconds),
+        "schedule": 60.0,  # Run orchestrator every 1 minute
         "options": {
-            "expires": settings.ping_interval_seconds - 5  # Expire before next run
+            "expires": 55  # Expire before next run
         }
     },
     "collect-all-metrics": {
@@ -78,7 +78,10 @@ celery_app.conf.beat_schedule = {
     },
     "dns-resolve-all-vms": {
         "task": "vmledger.tasks.schedule_dns_resolution",
-        "schedule": crontab(hour="*/6", minute=15),  # Every 6 hours at :15
+        "schedule": 3600.0,  # Run orchestrator every 1 hour
+        "options": {
+            "expires": 3500
+        }
     },
 }
 
