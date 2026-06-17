@@ -17,11 +17,12 @@ jobs:
       # TestSprite action autonomously explores your application, 
       # runs tests based on your specs, and reports directly to your PR.
       - name: Run TestSprite
-        uses: testsprite/testsprite-action@v1
+        uses: TestSprite/run-action@v1
         with:
           # You need to configure this secret in your GitHub repository:
           # Settings > Secrets and variables > Actions > New repository secret
-          api-key: ${{ secrets.TESTSPRITE_API_KEY }}
+          testsprite-api-key: ${{ secrets.TESTSPRITE_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           
           # Optional: point TestSprite to your specific environment or build commands
           # environment-url: "http://localhost:3000" (if starting up app in CI)
