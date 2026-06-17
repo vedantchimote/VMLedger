@@ -23,6 +23,7 @@ jobs:
           # Settings > Secrets and variables > Actions > New repository secret
           testsprite-api-key: ${{ secrets.TESTSPRITE_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          base_url: "https://66f0-2402-e280-3eb3-700-c8b8-ba02-6755-bd02.ngrok-free.app"
           
           # Optional: point TestSprite to your specific environment or build commands
           # environment-url: "http://localhost:3000" (if starting up app in CI)
