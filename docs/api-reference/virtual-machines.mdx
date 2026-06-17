@@ -45,7 +45,9 @@ Retrieve all VMs owned by the authenticated user.
       "latest_cpu": 45.2,
       "latest_ram_used": 2048,
       "latest_ram_total": 4096,
-      "latest_disk_percent": 67.5
+      "latest_disk_percent": 67.5,
+      "ping_interval_minutes": 5,
+      "dns_interval_hours": 6
     }
   ],
   "pagination": {
@@ -161,7 +163,9 @@ Retrieve detailed information about a specific VM.
     "latest_cpu": 45.2,
     "latest_ram_used": 2048,
     "latest_ram_total": 4096,
-    "latest_disk_percent": 67.5
+    "latest_disk_percent": 67.5,
+    "ping_interval_minutes": 5,
+    "dns_interval_hours": 6
   },
   "timestamp": "2026-05-08T10:36:00Z"
 }
@@ -234,8 +238,11 @@ Register a new virtual machine.
   "ssh_port": 22,
   "ssh_username": "root",
   "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+  "ssh_password": "optional_password",
   "tags": ["production", "web-server", "nginx"],
-  "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24.0"
+  "deployment_notes": "# Web Server\n\n## Installed Software\n- Nginx 1.24.0",
+  "ping_interval_minutes": 5,
+  "dns_interval_hours": 6
 }
 ```
 
@@ -252,6 +259,8 @@ Register a new virtual machine.
 | ssh_password | string | Yes* | SSH password (alternative to key) |
 | tags | array | No | Array of tags (max 20) |
 | deployment_notes | string | No | Markdown notes (max 50,000 chars) |
+| ping_interval_minutes | integer | No | Interval in minutes for health checks (default: 5) |
+| dns_interval_hours | integer | No | Interval in hours for DNS drift detection (default: 6) |
 
 <Info>
 **Authentication:** Either `ssh_private_key` OR `ssh_password` is required (not both).
@@ -274,7 +283,9 @@ SSH key authentication is recommended for better security.
     "created_at": "2026-05-08T10:30:00Z",
     "updated_at": "2026-05-08T10:30:00Z",
     "last_seen": null,
-    "is_reachable": null
+    "is_reachable": null,
+    "ping_interval_minutes": 5,
+    "dns_interval_hours": 6
   },
   "timestamp": "2026-05-08T10:30:00Z"
 }
@@ -346,7 +357,9 @@ curl -X POST http://localhost:8000/api/vms \
     "ssh_port": 22,
     "ssh_username": "root",
     "ssh_private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
-    "tags": ["production", "web-server"]
+    "tags": ["production", "web-server"],
+    "ping_interval_minutes": 1,
+    "dns_interval_hours": 12
   }'
 ```
 
@@ -418,7 +431,8 @@ Update VM details. Only provided fields will be updated.
 {
   "hostname": "web-server-01-updated",
   "tags": ["production", "web-server", "nginx", "ssl"],
-  "deployment_notes": "# Web Server\n\n## Recent Changes\n- Added SSL certificate"
+  "deployment_notes": "# Web Server\n\n## Recent Changes\n- Added SSL certificate",
+  "ping_interval_minutes": 2
 }
 ```
 
@@ -437,6 +451,8 @@ All fields are optional. Only include fields you want to update.
 | ssh_password | string | New SSH password |
 | tags | array | Array of tags (replaces existing) |
 | deployment_notes | string | Markdown notes (replaces existing) |
+| ping_interval_minutes | integer | Interval in minutes for health checks |
+| dns_interval_hours | integer | Interval in hours for DNS drift detection |
 
 ### Response (200 OK)
 
@@ -454,7 +470,9 @@ All fields are optional. Only include fields you want to update.
     "created_at": "2026-05-08T10:30:00Z",
     "updated_at": "2026-05-08T11:00:00Z",
     "last_seen": "2026-05-08T10:35:00Z",
-    "is_reachable": true
+    "is_reachable": true,
+    "ping_interval_minutes": 2,
+    "dns_interval_hours": 6
   },
   "timestamp": "2026-05-08T11:00:00Z"
 }

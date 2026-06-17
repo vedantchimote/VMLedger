@@ -391,11 +391,19 @@ curl http://localhost:8000/api/vms/123/metrics \
 
 <CardGroup cols={2}>
   <Card title="Health Checks" icon="clock">
-    **Default:** Every 60 seconds
+    **Default:** Every 5 minutes (300 seconds)
     
-    **Configurable:** Yes (via `PING_INTERVAL` env var)
+    **Configurable:** Yes, individually per VM
     
-    **Recommended:** 30-120 seconds
+    **Recommended:** 1-5 minutes
+  </Card>
+  
+  <Card title="DNS Drift Detection" icon="clock">
+    **Default:** Every 6 hours
+    
+    **Configurable:** Yes, individually per VM
+    
+    **Recommended:** 1-24 hours
   </Card>
   
   <Card title="Metrics Collection" icon="clock">
@@ -407,11 +415,12 @@ curl http://localhost:8000/api/vms/123/metrics \
   </Card>
 </CardGroup>
 
-### Configuring Intervals
+You can configure the Ping Check interval and DNS Check interval individually for each Virtual Machine during VM registration or by editing the VM settings from the dashboard. This allows you to check critical production servers more frequently and development servers less frequently.
+
+The Metrics Collection interval is global and configured via the environment variables:
 
 ```bash
 # In .env file
-PING_INTERVAL=60          # Health checks every 60 seconds
 METRICS_INTERVAL=300      # Metrics every 5 minutes
 ```
 
@@ -738,18 +747,14 @@ flowchart TD
 <CardGroup cols={2}>
   <Card title="Monitor Critical VMs More Frequently" icon="gauge-high">
     For production VMs, use shorter intervals:
-    ```bash
-    PING_INTERVAL=30  # Every 30 seconds
-    METRICS_INTERVAL=180  # Every 3 minutes
-    ```
+    - Ping Interval: 1 minute
+    - DNS Interval: 1 hour
   </Card>
   
   <Card title="Use Longer Intervals for Many VMs" icon="gauge-low">
     For 100+ VMs, use longer intervals:
-    ```bash
-    PING_INTERVAL=120  # Every 2 minutes
-    METRICS_INTERVAL=600  # Every 10 minutes
-    ```
+    - Ping Interval: 5-10 minutes
+    - DNS Interval: 12-24 hours
   </Card>
   
   <Card title="Scale Workers with VM Count" icon="users">
