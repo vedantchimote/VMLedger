@@ -8,6 +8,29 @@ icon: 'plus'
 
 This guide walks you through registering your first VM in VMLedger, from gathering information to verifying monitoring is working.
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard
+    participant API
+    participant Worker
+    participant VM
+
+    User->>Dashboard: Fill form + SSH Key
+    Dashboard->>API: POST /api/vms
+    API->>API: Encrypt SSH Key
+    API->>API: Store in Database
+    API-->>Dashboard: Success
+    
+    Note over Worker,VM: Within 60 seconds
+    Worker->>VM: Initial Ping Check
+    VM-->>Worker: Reachable
+    
+    Note over Worker,VM: Within 5 minutes
+    Worker->>VM: SSH connection
+    Worker->>VM: Collect metrics (CPU, RAM, Disk)
+```
+
 ## Prerequisites
 
 <CardGroup cols={2}>
