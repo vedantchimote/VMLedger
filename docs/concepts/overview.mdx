@@ -12,6 +12,9 @@ VMLedger is a **centralized platform** for managing and monitoring virtual machi
 - 🔔 Get notified when something goes wrong
 - 🚀 Track deployments and changes
 - 🔍 Search and filter your VM inventory
+- 📦 Manage LXC containers on your hosts
+- 🩺 Monitor systemd service health
+- 📜 Stream real-time logs from any VM
 
 <Note>
   **New to infrastructure management?** Don't worry! We'll explain everything step by step.
@@ -34,6 +37,8 @@ graph TB
         E[Monitor Health]
         F[Collect Metrics]
         G[Send Alerts]
+        SVC[Check Services]
+        LXC[Manage Containers]
     end
     
     subgraph "Your VMs"
@@ -487,6 +492,71 @@ Now that you understand the core concepts, explore specific features:
   </Card>
 </CardGroup>
 
+### 7. LXC Container Management
+
+If your VM is a **Proxmox**, **LXD**, or **LXC** host, VMLedger can discover and manage the containers running on it:
+
+```mermaid
+flowchart LR
+    subgraph Host VM
+        A["Container 1<br/>nginx-proxy"]
+        B["Container 2<br/>app-backend"]
+        C["Container 3<br/>database"]
+    end
+
+    D[VMLedger] -->|"SSH + auto-detect"| Host VM
+    D -->|"Start / Stop / Restart"| A
+    D -->|"Start / Stop / Restart"| B
+    D -->|"Start / Stop / Restart"| C
+
+    style D fill:#0d9373,color:#fff
+    style A fill:#10b981,color:#fff
+    style B fill:#10b981,color:#fff
+    style C fill:#10b981,color:#fff
+```
+
+<Accordion title="What is LXC?">
+  **LXC (Linux Containers)** is a lightweight virtualization technology. Unlike full VMs which run their own kernel, LXC containers share the host's kernel — making them faster and more efficient.
+
+  **Real-world analogy**: VMs are like separate houses, while LXC containers are apartments in the same building — they share the foundation but have their own space.
+</Accordion>
+
+### 8. Service Health Monitoring
+
+Beyond checking if a VM is *reachable*, VMLedger can check if specific *services* (like nginx, postgresql) are *running*:
+
+```mermaid
+flowchart LR
+    A["VM is online ✅"] --> B{"But are the apps running?"}
+    B -->|"nginx"| C["active ✅"]
+    B -->|"postgresql"| D["active ✅"]
+    B -->|"redis"| E["inactive ❌"]
+
+    style A fill:#10b981,color:#fff
+    style C fill:#10b981,color:#fff
+    style D fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+```
+
+### 9. Live Log Viewer
+
+Watch your VM's system logs in real-time, directly in your browser — read-only, so you can't accidentally break anything:
+
+```mermaid
+sequenceDiagram
+    participant Browser as 👤 Your Browser
+    participant API as VMLedger API
+    participant VM as Your VM
+
+    Browser->>API: Open Live Logs
+    API->>VM: SSH + journalctl -f
+    loop Real-time
+        VM-->>API: New log line
+        API-->>Browser: WebSocket message
+        Browser->>Browser: Display in terminal
+    end
+```
+
 ## Glossary
 
 <AccordionGroup>
@@ -516,5 +586,21 @@ Now that you understand the core concepts, explore specific features:
   
   <Accordion title="Cooldown Period">
     A waiting time before sending another alert for the same issue, preventing alert spam.
+  </Accordion>
+  
+  <Accordion title="LXC (Linux Containers)">
+    A lightweight virtualization technology that lets you run multiple isolated Linux systems on a single host. Managed via tools like Proxmox (pct), LXD (lxc), or lxc-utils (lxc-ls).
+  </Accordion>
+  
+  <Accordion title="systemd">
+    The service manager used by most modern Linux distributions. VMLedger uses `systemctl is-active` to check if services are running.
+  </Accordion>
+  
+  <Accordion title="journalctl">
+    A command to view system logs on Linux. VMLedger's Live Log Viewer streams `journalctl -f` output to your browser.
+  </Accordion>
+  
+  <Accordion title="WebSocket">
+    A protocol for real-time, two-way communication between your browser and the server. Used by VMLedger for the SSH terminal and live log streaming.
   </Accordion>
 </AccordionGroup>
