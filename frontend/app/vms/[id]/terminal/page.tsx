@@ -81,13 +81,13 @@ export default function TerminalPage() {
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between px-6 py-3 bg-[#0d1117] border-b border-gray-800 shadow-sm z-10">
         <div className="flex items-center space-x-4">
-          <Link
-            href={`/vms/${vmId}`}
+          <button
+            onClick={() => window.close()}
             className="p-2 -ml-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-            title="Back to VM details"
+            title="Close Terminal Tab"
           >
             <ArrowLeft className="w-5 h-5" />
-          </Link>
+          </button>
           <div className="flex items-center space-x-3 border-l border-gray-700 pl-4">
             <div className={`w-3 h-3 rounded-full ${vm.is_reachable ? 'bg-green-500' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`}></div>
             <div>
@@ -106,8 +106,9 @@ export default function TerminalPage() {
             <span className="font-mono text-indigo-400">Ctrl+C</span> to interrupt process
           </div>
           <button
-            onClick={() => router.push(`/vms/${vmId}`)}
+            onClick={() => window.close()}
             className="px-4 py-1.5 text-sm font-medium bg-red-500/10 text-red-400 border border-red-500/20 rounded-md hover:bg-red-500/20 transition-colors"
+            title="Disconnect SSH Session and Close Tab"
           >
             Disconnect
           </button>
