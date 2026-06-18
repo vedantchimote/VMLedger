@@ -309,7 +309,7 @@ export default function VMDetailsPage() {
               </button>
               <div className="w-px h-8 bg-white/10"></div>
               <GlobalNotificationBell />
-              <Link href={`/vms/${vm.id}/terminal`} className="btn-secondary flex items-center gap-2 !bg-gray-800 hover:!bg-gray-700 !border-gray-700 text-gray-200">
+              <Link href={`/vms/${vm.id}/terminal`} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-2 !bg-gray-800 hover:!bg-gray-700 !border-gray-700 text-gray-200">
                 <svg
                   className="w-4 h-4"
                   fill="none"

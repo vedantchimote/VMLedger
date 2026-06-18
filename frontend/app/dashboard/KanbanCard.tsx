@@ -41,6 +41,8 @@ export function KanbanCard({ vm, router }: { vm: VM; router: any }) {
       <div className="flex gap-2 mt-2">
         <Link
           href={`/vms/${vm.id}/terminal`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex-1 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white rounded-lg transition-colors text-[10px] font-bold uppercase tracking-wider border border-white/5 flex items-center justify-center gap-1.5"
           title="Quick Connect (SSH)"
         >
