@@ -22,6 +22,21 @@ Before you begin, ensure you have the following installed:
   </Card>
 </CardGroup>
 
+```mermaid
+flowchart LR
+    A[1. Clone Repo] --> B[2. Configure .env]
+    B --> C[3. Start Docker]
+    C --> D[4. Migrate DB]
+    D --> E[5. Start UI]
+    E --> F[6. Register]
+    F --> G[7. Add VM]
+    G --> H[8. Monitor]
+
+    style C fill:#0d9373,color:#fff
+    style E fill:#3b82f6,color:#fff
+    style H fill:#f59e0b,color:#fff
+```
+
 ## Step 1: Clone the Repository
 
 ```bash

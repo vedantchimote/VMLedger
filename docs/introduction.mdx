@@ -18,6 +18,22 @@ description: 'Welcome to VMLedger - Your Virtual Machine Management Platform'
 
 VMLedger is a comprehensive virtual machine management platform designed to help infrastructure teams monitor, manage, and track their VM deployments across multiple environments.
 
+```mermaid
+flowchart LR
+    A[You] -->|Manage| B(VMLedger Dashboard)
+    B -->|SSH / Ping| C{Your VMs}
+    
+    C -->|Metrics| D[System Health]
+    C -->|Status| E[Uptime Tracking]
+    C -->|Logs| F[Live Logs]
+    
+    D -.->|Alerts| G[Slack/Discord]
+    
+    style B fill:#0d9373,color:#fff
+    style C fill:#3b82f6,color:#fff
+    style G fill:#f59e0b,color:#fff
+```
+
 <CardGroup cols={2}>
   <Card
     title="VM Management"
@@ -46,6 +62,27 @@ VMLedger is a comprehensive virtual machine management platform designed to help
     href="/features/deployment-tracking"
   >
     Track deployments with detailed notes and historical records
+  </Card>
+  <Card
+    title="LXC Containers"
+    icon="cubes"
+    href="/features/lxc-containers"
+  >
+    Discover and manage LXC containers on Proxmox, LXD, or standard LXC hosts
+  </Card>
+  <Card
+    title="Service Health"
+    icon="stethoscope"
+    href="/features/service-health"
+  >
+    Monitor systemd service status with automatic checks during metric collection
+  </Card>
+  <Card
+    title="Live Log Viewer"
+    icon="scroll"
+    href="/features/log-viewer"
+  >
+    Stream real-time journalctl logs via WebSocket in a read-only terminal
   </Card>
 </CardGroup>
 
@@ -89,6 +126,24 @@ VMLedger is a comprehensive virtual machine management platform designed to help
 - Rate limiting and account lockout protection
 - Encrypted credential storage
 - Comprehensive audit logging
+
+### 📦 LXC Container Management
+- Auto-detect Proxmox (`pct`), LXD (`lxc`), or standard LXC (`lxc-ls`) providers
+- List all containers with live status (running/stopped)
+- Start, stop, and restart containers from the dashboard
+- Graceful handling of non-LXC VMs (shows friendly message)
+
+### 🩺 Service Health Monitor
+- Track systemd services (nginx, postgresql, docker, etc.) per VM
+- Automatic checks during metric collection cycle (zero extra SSH connections)
+- Custom check commands for non-systemd services
+- On-demand "Check Now" trigger from the dashboard
+
+### 📜 Live Log Viewer
+- Real-time `journalctl -f` stream in a browser-based terminal
+- Read-only mode — keyboard input silently dropped
+- Color-coded ANSI output via xterm.js
+- Same auth and credential flow as SSH Terminal
 
 ## Technology Stack
 

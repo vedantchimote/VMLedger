@@ -38,6 +38,25 @@ description: 'Detailed installation guide for VMLedger'
 
 ## Docker Compose Installation
 
+```mermaid
+flowchart TD
+    A[docker-compose up -d] --> B[Pull / Build Images]
+    B --> C[Network Setup]
+    
+    C --> D[(PostgreSQL)]
+    C --> E[(Redis)]
+    
+    D --> F[FastAPI Backend]
+    E --> F
+    
+    E --> G[Celery Beat]
+    E --> H[Celery Workers]
+    
+    F --> I[Next.js Frontend]
+    
+    style A fill:#3b82f6,color:#fff
+```
+
 ### 1. Install Docker
 
 <Tabs>
