@@ -9,6 +9,7 @@ from vmledger.models.ping_result import PingResult
 from vmledger.models.metric import Metric
 from vmledger.models.alert import Alert
 from vmledger.models.alert_config import AlertConfig
+from vmledger.models.service_check import ServiceConfig, ServiceStatus
 
 __all__ = [
     "User",
@@ -18,4 +19,6 @@ __all__ = [
     "Metric",
     "Alert",
     "AlertConfig",
+    "ServiceConfig",
+    "ServiceStatus",
 ]
