@@ -167,3 +167,32 @@ export interface SearchResult {
   }[];
   rank: number;
 }
+
+// Service Types
+export interface ServiceWithStatus {
+  id: number;
+  vm_id: number;
+  service_name: string;
+  display_name: string | null;
+  check_command: string | null;
+  enabled: boolean;
+  status: 'active' | 'inactive' | 'failed' | 'unknown' | 'error' | string | null;
+}
+
+export interface ServiceCreateRequest {
+  service_name: string;
+  display_name?: string;
+  check_command?: string;
+}
+
+// LXC Types
+export interface LxcContainer {
+  vmid: string;
+  status: string;
+  name: string;
+}
+
+export interface LxcResponse {
+  is_proxmox: boolean;
+  containers: LxcContainer[];
+}

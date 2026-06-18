@@ -16,6 +16,9 @@ import type {
   Alert,
   AlertConfig,
   SearchResult,
+  ServiceWithStatus,
+  ServiceCreateRequest,
+  LxcResponse,
 } from "@/types/api";
 
 // Token storage keys
@@ -452,6 +455,36 @@ export const api = {
       return response.data;
     },
   },
+
+  // Services
+  services: {
+    async list(vmId: number): Promise<ServiceWithStatus[]> {
+      const response = await apiClient.get<ServiceWithStatus[]>(`/vms/${vmId}/services`);
+      return response.data; // Note: We don't use ApiResponse wrapper in this endpoint as per backend implementation
+    },
+    async add(vmId: number, data: ServiceCreateRequest): Promise<ServiceWithStatus> {
+      const response = await apiClient.post<ServiceWithStatus>(`/vms/${vmId}/services`, data);
+      return response.data;
+    },
+    async remove(vmId: number, serviceId: number): Promise<void> {
+      await apiClient.delete(`/vms/${vmId}/services/${serviceId}`);
+    },
+    async checkNow(vmId: number): Promise<void> {
+      await apiClient.post(`/vms/${vmId}/services/check`);
+    },
+  },
+
+  // LXC
+  lxc: {
+    async list(vmId: number): Promise<LxcResponse> {
+      const response = await apiClient.get<LxcResponse>(`/vms/${vmId}/lxc`);
+      return response.data;
+    },
+    async action(vmId: number, lxcId: string, action: 'start' | 'stop' | 'restart'): Promise<{success: boolean, message: string}> {
+      const response = await apiClient.post<{success: boolean, message: string}>(`/vms/${vmId}/lxc/${lxcId}/action`, { action });
+      return response.data;
+    }
+  }
 };
 
 export default apiClient;
