@@ -31,10 +31,11 @@ router = APIRouter()
 class SSHSessionManager:
     """Manages an interactive SSH session via WebSockets."""
 
-    def __init__(self, websocket: WebSocket, client: paramiko.SSHClient, channel: paramiko.Channel):
+    def __init__(self, websocket: WebSocket, client: paramiko.SSHClient, channel: paramiko.Channel, read_only: bool = False):
         self.websocket = websocket
         self.client = client
         self.channel = channel
+        self.read_only = read_only
         self.queue: asyncio.Queue = asyncio.Queue()
         self.running = True
         self.reader_thread: Optional[threading.Thread] = None
@@ -134,9 +135,9 @@ class SSHSessionManager:
                     except json.JSONDecodeError:
                         pass # Not JSON, treat as raw input
                 
-                # Send raw input to SSH channel
-                # We use to_thread to avoid blocking the event loop
-                await asyncio.to_thread(self.channel.sendall, message)
+                # Send raw input to SSH channel if not read-only
+                if not self.read_only:
+                    await asyncio.to_thread(self.channel.sendall, message)
         except WebSocketDisconnect:
             logger.info("WebSocket disconnected by client.")
             self.running = False
@@ -288,6 +289,139 @@ async def ssh_terminal_endpoint(
         logger.info("WebSocket disconnected.")
     except Exception as e:
         logger.error(f"SSH WebSocket error: {e}")
+        try:
+            await websocket.send_text(f"\\r\\n[Internal Error: {e}]\\r\\n")
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        except Exception:
+            pass
+    finally:
+        if session_manager:
+            session_manager.close()
+        if db:
+            db.close()
+
+@router.websocket("/ws/vms/{vm_id}/logs")
+async def ssh_logs(websocket: WebSocket, vm_id: int, token: str = Query(...)):
+    """WebSocket endpoint for a read-only stream of VM logs."""
+    await websocket.accept()
+    
+    db = None
+    session_manager = None
+    
+    try:
+        # 1. Authenticate user from token
+        db = next(get_db())
+        auth_service = AuthService(db)
+        try:
+            user = auth_service.validate_token(token)
+        except Exception as e:
+            logger.warning(f"Log WebSocket auth failed: {e}")
+            await websocket.send_text(f"\\r\\n[Error: Authentication failed: {e}]\\r\\n")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        # 2. Retrieve VM and verify ownership
+        vm = db.query(VM).filter(VM.id == vm_id).first()
+        if not vm:
+            await websocket.send_text(f"\\r\\n[Error: VM {vm_id} not found]\\r\\n")
+            await websocket.close(code=status.WS_1004_NO_STATUS_RCVD)
+            return
+            
+        if vm.user_id != user.id:
+            await websocket.send_text(f"\\r\\n[Error: Access denied to VM {vm_id}]\\r\\n")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        # 3. Retrieve Credentials
+        credential = db.query(Credential).filter(Credential.vm_id == vm_id).first()
+        if not credential:
+            await websocket.send_text("\\r\\n[Error: No SSH credentials found for this VM]\\r\\n")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        # 4. Decrypt Credentials
+        cred_manager = CredentialManager(db)
+        try:
+            if credential.auth_type == 'ssh_key':
+                decrypted_credential = cred_manager.decrypt_ssh_key(user.id, credential.encrypted_credential)
+            else:
+                decrypted_credential = cred_manager.decrypt_password(user.id, credential.encrypted_credential)
+        except Exception as e:
+            logger.error(f"Credential decryption failed for VM {vm.id}: {e}")
+            await websocket.send_text("\\r\\n[Error: Credential decryption failed]\\r\\n")
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+            return
+            
+        db.close()
+        db = None
+
+        # 5. Connect via Paramiko
+        await websocket.send_text(f"Connecting to {vm.hostname} to stream logs...\\r\\n")
+        
+        def _connect():
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            if credential.auth_type == 'ssh_key':
+                key_file = StringIO(decrypted_credential)
+                key_classes = [paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key]
+                if hasattr(paramiko, 'DSSKey'):
+                    key_classes.insert(1, paramiko.DSSKey)
+                
+                private_key = None
+                for key_class in key_classes:
+                    try:
+                        key_file.seek(0)
+                        private_key = key_class.from_private_key(key_file)
+                        break
+                    except paramiko.SSHException:
+                        continue
+                
+                if private_key is None:
+                    raise Exception("Failed to load SSH private key")
+                    
+                client.connect(
+                    hostname=vm.ip_address,
+                    port=vm.ssh_port,
+                    username=credential.ssh_username,
+                    pkey=private_key,
+                    timeout=10,
+                )
+            else:
+                client.connect(
+                    hostname=vm.ip_address,
+                    port=vm.ssh_port,
+                    username=credential.ssh_username,
+                    password=decrypted_credential,
+                    timeout=10,
+                )
+            
+            channel = client.get_transport().open_session()
+            channel.get_pty(term='xterm-256color', width=120, height=40)
+            channel.exec_command("journalctl -f -n 100")
+            return client, channel
+
+        try:
+            client, channel = await asyncio.to_thread(_connect)
+        except Exception as e:
+            logger.error(f"SSH log connection failed to {vm.ip_address}: {e}")
+            await websocket.send_text(f"\\r\\n[Error: Log connection failed: {e}]\\r\\n")
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+            return
+
+        # 6. Start bridging the connection in read-only mode
+        session_manager = SSHSessionManager(websocket, client, channel, read_only=True)
+        session_manager.start_reader_thread()
+        
+        await asyncio.gather(
+            session_manager.consume_queue(),
+            session_manager.consume_websocket()
+        )
+
+    except WebSocketDisconnect:
+        logger.info("Log WebSocket disconnected.")
+    except Exception as e:
+        logger.error(f"Log WebSocket error: {e}")
         try:
             await websocket.send_text(f"\\r\\n[Internal Error: {e}]\\r\\n")
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
