@@ -15,6 +15,18 @@ https://api.yourdomain.com
 ```
 </CodeGroup>
 
+```mermaid
+sequenceDiagram
+    participant Client as Your App / Script
+    participant API as VMLedger API
+    
+    Client->>API: POST /api/auth/login
+    API-->>Client: JWT Token
+    
+    Client->>API: GET /api/vms<br/>Authorization: Bearer <Token>
+    API-->>Client: JSON Data
+```
+
 ## Authentication
 
 VMLedger uses JWT (JSON Web Tokens) for authentication. Include the token in the `Authorization` header:

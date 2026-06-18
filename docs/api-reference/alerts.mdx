@@ -9,6 +9,22 @@ api: 'GET /api/vms/{vm_id}/alerts/config'
 
 The Alerts API manages alert configurations and provides access to alert history for your VMs.
 
+```mermaid
+flowchart TD
+    A[Monitor Check Fails] --> B{Alert Enabled?}
+    B -->|No| C[Ignore]
+    B -->|Yes| D{In Cooldown?}
+    
+    D -->|Yes| E[Skip Alert]
+    D -->|No| F[Send Webhook/Email]
+    
+    F --> G[Log to History]
+    G --> H[Start Cooldown Timer]
+
+    style A fill:#ef4444,color:#fff
+    style F fill:#f59e0b,color:#fff
+```
+
 ## Get Alert Configuration
 
 <api method="GET" endpoint="/api/vms/{vm_id}/alerts/config" />

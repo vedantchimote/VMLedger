@@ -44,6 +44,22 @@ The Search API provides powerful full-text search with **prefix matching** acros
 
 ### Search Features
 
+```mermaid
+flowchart TD
+    A[Search Query: "ngin"] --> B{Full-Text Search}
+    B -->|Prefix match| C[tsquery 'ngin:*']
+    
+    A --> D{ILIKE Fallback}
+    D -->|Substring match| E['%ngin%']
+    
+    C --> F((PostgreSQL DB))
+    E --> F
+    
+    F --> G[Rank Results]
+    G -->|Highest score| H[1. Nginx proxy]
+    G -->|Partial score| I[2. app-staging]
+```
+
 - **Prefix matching**: `harbor` matches `harbornode`, `harbor-vm`, etc. (`:*` suffix in tsquery)
 - **ILIKE fallback**: Catches mid-word substrings that tsquery misses (e.g. `node` in `workernode4`)
 - **Multi-term search**: `nginx production` uses OR logic — matches either term

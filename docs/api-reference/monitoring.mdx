@@ -9,6 +9,24 @@ api: 'GET /api/vms/{vm_id}/status'
 
 The Monitoring API provides access to health check results (ping history) and resource metrics (CPU, RAM, disk usage) collected from your VMs.
 
+```mermaid
+flowchart LR
+    A[Celery Beat] -->|Trigger| B[Workers]
+    B -->|Ping: 60s| C[VMs]
+    B -->|SSH: 5m| C
+    
+    B -.->|Store Data| D[(PostgreSQL)]
+    
+    E[You / API] -->|GET /metrics| F[FastAPI]
+    F -->|Query| D
+    F -.->|JSON| E
+
+    style A fill:#f59e0b,color:#fff
+    style B fill:#f59e0b,color:#fff
+    style D fill:#8b5cf6,color:#fff
+    style F fill:#10b981,color:#fff
+```
+
 ## Get VM Status
 
 <api method="GET" endpoint="/api/vms/{vm_id}/status" />

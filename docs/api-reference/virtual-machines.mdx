@@ -9,6 +9,21 @@ api: 'GET /api/vms'
 
 The Virtual Machines API provides complete CRUD (Create, Read, Update, Delete) operations for managing your VM inventory. All endpoints require authentication.
 
+```mermaid
+stateDiagram-v2
+    [*] --> Created: POST /api/vms
+    Created --> Unreachable: Initial State
+    Unreachable --> Reachable: Ping Check Success
+    Reachable --> Unreachable: Ping Check Fails
+    Reachable --> Updated: PUT /api/vms/{id}
+    Unreachable --> Updated: PUT /api/vms/{id}
+    Updated --> Reachable
+    Updated --> Unreachable
+    Reachable --> Deleted: DELETE /api/vms/{id}
+    Unreachable --> Deleted: DELETE /api/vms/{id}
+    Deleted --> [*]
+```
+
 ## List VMs
 
 <api method="GET" endpoint="/api/vms" />
