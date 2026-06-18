@@ -8,6 +8,28 @@ icon: 'gauge-high'
 
 VMLedger uses Redis for caching, session storage, and as a message broker for Celery.
 
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FastAPI
+    participant Redis
+    participant DB as PostgreSQL
+
+    Client->>API: GET /api/vms (Dashboard)
+    API->>Redis: Check cache "dashboard:{user_id}"
+    
+    alt Cache Hit
+        Redis-->>API: Return cached JSON
+        API-->>Client: Quick response
+    else Cache Miss
+        Redis-->>API: null
+        API->>DB: Query VMs and metrics
+        DB-->>API: Database results
+        API->>Redis: Set "dashboard:{user_id}" (TTL: 30s)
+        API-->>Client: Response
+    end
+```
+
 ## Cache Usage
 
 <CardGroup cols={3}>

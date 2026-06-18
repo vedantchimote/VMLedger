@@ -18,6 +18,8 @@ erDiagram
     VMS ||--o{ METRICS : has
     VMS ||--o{ ALERTS : has
     VMS ||--o| ALERT_CONFIGS : has
+    VMS ||--o{ SERVICE_CONFIGS : monitors
+    VMS ||--o{ SERVICE_STATUSES : tracks
     
     USERS {
         int id PK
@@ -68,6 +70,24 @@ erDiagram
         int ram_total_mb
         float disk_usage_percent
     }
+
+    SERVICE_CONFIGS {
+        int id PK
+        int vm_id FK
+        string service_name
+        string display_name
+        string check_command
+        boolean enabled
+        timestamp created_at
+    }
+
+    SERVICE_STATUSES {
+        int id PK
+        int vm_id FK
+        string service_name
+        string status
+        timestamp checked_at
+    }
 ```
 
 ## Key Tables
@@ -94,6 +114,16 @@ erDiagram
 ### Metrics
 - Resource usage history (last 1000 per VM)
 - CPU, RAM, disk metrics
+
+### Service Configs
+- Per-VM service monitoring configuration
+- Stores systemd unit names and optional custom check commands
+- One-to-many relationship with VMs
+
+### Service Statuses
+- Latest health check result for each configured service
+- Status values: `active`, `inactive`, `failed`, `unknown`, `error`
+- Updated during each metric collection cycle
 
 ## Indexes
 

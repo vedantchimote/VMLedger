@@ -8,6 +8,38 @@ icon: 'window'
 
 VMLedger's frontend is built with Next.js 14, React, and TailwindCSS for a modern, responsive user interface.
 
+```mermaid
+flowchart TD
+    A[Browser] --> B[Next.js App Router]
+    
+    subgraph "Pages"
+        B --> C[Dashboard]
+        B --> D[VM Details]
+        B --> E[Auth Pages]
+    end
+    
+    subgraph "Components"
+        C --> F[VMList / VMCard]
+        D --> G[MetricsChart]
+        D --> H[WebTerminal]
+    end
+    
+    subgraph "State & Data"
+        F --> I[React Query]
+        G --> I
+        H --> J[WebSocket]
+        
+        I --> K[Axios API Client]
+    end
+    
+    K --> L((FastAPI Backend))
+    J --> L
+    
+    style B fill:#3b82f6,color:#fff
+    style I fill:#f59e0b,color:#fff
+    style K fill:#10b981,color:#fff
+```
+
 ## Technology Stack
 
 <CardGroup cols={3}>

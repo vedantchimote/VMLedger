@@ -8,6 +8,32 @@ icon: 'server'
 
 VMLedger's backend is built with FastAPI, providing a high-performance async API for VM management and monitoring.
 
+```mermaid
+flowchart TD
+    subgraph "FastAPI Application"
+        A[API Routers] --> B[Service Layer]
+        B --> C[Data Access Layer]
+        
+        A -.-> D[Request Validation<br/>Pydantic]
+        A -.-> E[Auth Middleware<br/>JWT]
+    end
+    
+    subgraph "Background Processing"
+        F[Celery Beat] -->|Schedules| G[Redis Broker]
+        G -->|Tasks| H[Celery Workers]
+        H -->|Reuses| B
+    end
+    
+    C --> I[(PostgreSQL)]
+    B --> J[Paramiko SSH]
+    J --> K[Target VMs]
+    
+    style A fill:#10b981,color:#fff
+    style B fill:#3b82f6,color:#fff
+    style C fill:#8b5cf6,color:#fff
+    style H fill:#f59e0b,color:#fff
+```
+
 ## Technology Stack
 
 <CardGroup cols={3}>
@@ -24,7 +50,7 @@ VMLedger's backend is built with FastAPI, providing a high-performance async API
   </Card>
   
   <Card title="Paramiko" icon="key">
-    SSH client for metrics
+    SSH client for metrics, terminal, logs, and LXC management
   </Card>
   
   <Card title="Cryptography" icon="lock">
@@ -43,12 +69,16 @@ vmledger/
 ├── api/                    # API endpoints
 │   ├── auth.py            # Authentication routes
 │   ├── vms.py             # VM management routes
+│   ├── ssh.py             # SSH terminal & log streaming (WebSocket)
+│   ├── services.py        # Service health monitoring routes
+│   ├── lxc.py             # LXC container management routes
 │   ├── monitoring.py      # Monitoring routes
 │   └── alerts.py          # Alert routes
 ├── services/              # Business logic
 │   ├── auth_service.py
 │   ├── vm_service.py
 │   ├── credential_manager.py
+│   ├── ssh_utils.py
 │   ├── health_check_service.py
 │   ├── metric_collector_service.py
 │   ├── search_engine_service.py
@@ -59,7 +89,9 @@ vmledger/
 │   ├── credential.py
 │   ├── ping_result.py
 │   ├── metric.py
-│   └── alert.py
+│   ├── alert.py
+│   ├── service_config.py  # Service monitoring configuration
+│   └── service_status.py  # Service health check results
 ├── schemas/               # Pydantic schemas
 │   ├── auth.py
 │   ├── vm.py
