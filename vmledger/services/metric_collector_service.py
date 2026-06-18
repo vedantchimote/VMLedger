@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from vmledger.models.vm import VM
 from vmledger.models.credential import Credential
 from vmledger.models.metric import Metric
+from vmledger.models.service_check import ServiceConfig, ServiceStatus
 from vmledger.services.credential_manager import CredentialManager
 from vmledger.config import settings
 from vmledger.exceptions import (
@@ -112,71 +113,15 @@ class MetricCollectorService:
         Raises:
             SSHConnectionError: If connection fails
         """
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        try:
-            if auth_type == 'ssh_key':
-                # Load private key from string
-                key_file = StringIO(credential)
-                
-                # Try different key types
-                private_key = None
-                key_classes = [
-                    paramiko.RSAKey,
-                    paramiko.ECDSAKey,
-                    paramiko.Ed25519Key
-                ]
-                
-                # Add DSSKey if available (deprecated in newer Paramiko versions)
-                if hasattr(paramiko, 'DSSKey'):
-                    key_classes.insert(1, paramiko.DSSKey)
-                
-                for key_class in key_classes:
-                    try:
-                        key_file.seek(0)
-                        private_key = key_class.from_private_key(key_file)
-                        break
-                    except paramiko.SSHException:
-                        continue
-                
-                if private_key is None:
-                    raise SSHConnectionError("Failed to load SSH private key")
-                
-                # Connect with private key
-                client.connect(
-                    hostname=ip_address,
-                    port=port,
-                    username=username,
-                    pkey=private_key,
-                    timeout=self.connection_timeout,
-                    banner_timeout=self.connection_timeout,
-                    auth_timeout=self.connection_timeout
-                )
-            else:
-                # Connect with password
-                client.connect(
-                    hostname=ip_address,
-                    port=port,
-                    username=username,
-                    password=credential,
-                    timeout=self.connection_timeout,
-                    banner_timeout=self.connection_timeout,
-                    auth_timeout=self.connection_timeout
-                )
-            
-            logger.debug(f"SSH connection established to {ip_address}:{port}")
-            return client
-            
-        except paramiko.AuthenticationException as e:
-            logger.error(f"SSH authentication failed for {ip_address}:{port}: {e}")
-            raise SSHConnectionError(f"Authentication failed: {e}")
-        except paramiko.SSHException as e:
-            logger.error(f"SSH connection error for {ip_address}:{port}: {e}")
-            raise SSHConnectionError(f"SSH error: {e}")
-        except Exception as e:
-            logger.error(f"Failed to connect to {ip_address}:{port}: {e}")
-            raise SSHConnectionError(f"Connection failed: {e}")
+        from vmledger.services.ssh_utils import SSHUtils
+        return SSHUtils.create_ssh_client(
+            ip_address=ip_address,
+            port=port,
+            username=username,
+            auth_type=auth_type,
+            credential=credential,
+            connection_timeout=self.connection_timeout
+        )
     
     def _execute_command(
         self,
@@ -196,29 +141,60 @@ class MetricCollectorService:
         Raises:
             CommandExecutionError: If command execution fails
         """
-        try:
-            # Execute command with timeout
-            stdin, stdout, stderr = client.exec_command(
-                command,
-                timeout=self.command_timeout
-            )
-            
-            # Read output with timeout
-            stdout_data = stdout.read().decode('utf-8').strip()
-            stderr_data = stderr.read().decode('utf-8').strip()
-            exit_code = stdout.channel.recv_exit_status()
-            
-            logger.debug(
-                f"Command executed: {command[:50]}... "
-                f"(exit_code={exit_code}, stdout_len={len(stdout_data)})"
-            )
-            
-            return stdout_data, stderr_data, exit_code
-            
-        except Exception as e:
-            logger.error(f"Command execution failed: {e}")
-            raise CommandExecutionError(f"Failed to execute command: {e}")
+        from vmledger.services.ssh_utils import SSHUtils
+        return SSHUtils.execute_command(
+            client=client,
+            command=command,
+            command_timeout=self.command_timeout
+        )
     
+    def _check_services(self, client: paramiko.SSHClient, vm: VM) -> None:
+        """
+        Check health of all configured services for this VM.
+        """
+        services = self.db.query(ServiceConfig).filter(
+            ServiceConfig.vm_id == vm.id,
+            ServiceConfig.enabled == True
+        ).all()
+        
+        if not services:
+            return
+            
+        for svc in services:
+            command = svc.check_command or f"systemctl is-active {svc.service_name}"
+            try:
+                from vmledger.services.ssh_utils import SSHUtils
+                stdout, stderr, exit_code = SSHUtils.execute_command(
+                    client=client, 
+                    command=command,
+                    command_timeout=10
+                )
+                status = stdout.strip() if stdout else "unknown"
+                # If command fails completely (e.g. not found), it might return empty or error
+                if exit_code != 0 and not status:
+                    status = "failed"
+            except Exception as e:
+                logger.error(f"Service check failed for {svc.service_name}: {e}")
+                status = "error"
+                
+            # Upsert status
+            existing_status = self.db.query(ServiceStatus).filter(
+                ServiceStatus.vm_id == vm.id,
+                ServiceStatus.service_name == svc.service_name
+            ).first()
+            
+            if existing_status:
+                existing_status.status = status
+            else:
+                new_status = ServiceStatus(
+                    vm_id=vm.id,
+                    service_name=svc.service_name,
+                    status=status
+                )
+                self.db.add(new_status)
+                
+        self.db.commit()
+
     def detect_os(self, client: paramiko.SSHClient) -> str:
         """
         Detect operating system using uname command.
@@ -558,6 +534,12 @@ class MetricCollectorService:
                     cpu_usage = self.get_cpu_usage(client, os_type)
                     ram_used, ram_total = self.get_memory_usage(client, os_type)
                     disk_used, disk_total, disk_percent = self.get_disk_usage(client)
+                    
+                    # Check service health
+                    try:
+                        self._check_services(client, vm)
+                    except Exception as e:
+                        logger.error(f"Failed to check services for VM {vm.id}: {e}")
                     
                     # Check if we got at least some metrics
                     if cpu_usage is not None or ram_used is not None or disk_used is not None:

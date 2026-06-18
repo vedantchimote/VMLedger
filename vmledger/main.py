@@ -186,10 +186,12 @@ async def root():
 
 
 # Import and include API routers
-from vmledger.api import auth, vms, ssh
+from vmledger.api import auth, vms, ssh, services, lxc
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(vms.router, prefix="/api/vms", tags=["VMs"])
+app.include_router(services.router, prefix="/api/vms", tags=["Services"])
+app.include_router(lxc.router, prefix="/api/vms", tags=["LXC"])
 app.include_router(ssh.router, tags=["SSH Terminal"])
 
 # Standalone routes for endpoints that conflict with /{vm_id} in the VMs router
