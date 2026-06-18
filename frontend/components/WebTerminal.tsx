@@ -9,9 +9,11 @@ import { Terminal as TerminalIcon, AlertTriangle } from "lucide-react";
 
 interface WebTerminalProps {
   vmId: number;
+  endpoint?: "ssh" | "logs";
+  readOnly?: boolean;
 }
 
-export default function WebTerminal({ vmId }: WebTerminalProps) {
+export default function WebTerminal({ vmId, endpoint = "ssh", readOnly = false }: WebTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -76,7 +78,7 @@ export default function WebTerminal({ vmId }: WebTerminalProps) {
       ? process.env.NEXT_PUBLIC_API_BASE_URL.replace(/^http/, "ws")
       : "ws://localhost:8000";
       
-    const ws = new WebSocket(`${wsUrl}/ws/vms/${vmId}/ssh?token=${token}`);
+    const ws = new WebSocket(`${wsUrl}/ws/vms/${vmId}/${endpoint}?token=${token}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -107,7 +109,7 @@ export default function WebTerminal({ vmId }: WebTerminalProps) {
 
     // Handle terminal input -> send to WebSocket
     term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (!readOnly && ws.readyState === WebSocket.OPEN) {
         ws.send(data);
       }
     });
@@ -146,7 +148,9 @@ export default function WebTerminal({ vmId }: WebTerminalProps) {
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center space-x-2">
           <TerminalIcon className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-medium text-gray-300">Terminal</span>
+          <span className="text-sm font-medium text-gray-300">
+            {endpoint === "logs" ? "Live Log Stream" : "Terminal"}
+          </span>
         </div>
         <div className="flex items-center space-x-3">
           {status === "connecting" && (

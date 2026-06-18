@@ -33,8 +33,8 @@ import {
 } from "@/lib/validation";
 import GlobalNotificationBell from "@/components/GlobalNotificationBell";
 
-type TabType = "overview" | "specs" | "metrics" | "ping" | "notes" | "alerts";
-type TriggerType = "ping" | "dns" | "metrics";
+type TabType = "overview" | "specs" | "metrics" | "ping" | "notes" | "alerts" | "services" | "containers";
+type TriggerType = "ping" | "dns" | "metrics" | "services";
 
 export default function VMDetailsPage() {
   const router = useRouter();
@@ -320,6 +320,10 @@ export default function VMDetailsPage() {
                 </svg>
                 Terminal
               </Link>
+              <Link href={`/vms/${vm.id}/logs`} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-2 !bg-gray-800 hover:!bg-gray-700 !border-gray-700 text-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                Live Logs
+              </Link>
               <Link href={`/vms/${vm.id}/edit`} className="btn-secondary flex items-center gap-2">
                 <svg
                   className="w-4 h-4"
@@ -551,7 +555,7 @@ export default function VMDetailsPage() {
           {/* Tab Headers */}
           <div className="border-b border-white/5 bg-surface-900/50">
             <nav className="flex overflow-x-auto hide-scrollbar">
-              {["overview", "specs", "metrics", "ping", "notes", "alerts"].map((tab) => (
+              {["overview", "specs", "metrics", "ping", "notes", "alerts", "services", "containers"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as TabType)}
@@ -599,6 +603,12 @@ export default function VMDetailsPage() {
                 isConfigLoading={alertConfigLoading}
                 isHistoryLoading={alertHistoryLoading}
               />
+            )}
+            {activeTab === "services" && (
+              <ServicesTab vmId={vmId} />
+            )}
+            {activeTab === "containers" && (
+              <ContainersTab vmId={vmId} />
             )}
           </div>
         </div>
@@ -1703,6 +1713,354 @@ function SpecsTab({ vmId }: { vmId: number }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ==========================================
+// NEW TAB COMPONENT: Services
+// ==========================================
+
+function ServicesTab({ vmId }: { vmId: number }) {
+  const [services, setServices] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newService, setNewService] = useState({ name: "", displayName: "", command: "" });
+
+  const fetchServices = useCallback(async () => {
+    try {
+      const data = await api.services.list(vmId);
+      setServices(data || []);
+    } catch (err) {
+      console.error("Failed to fetch services:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [vmId]);
+
+  useEffect(() => {
+    fetchServices();
+  }, [fetchServices]);
+
+  const handleCheckNow = async () => {
+    setIsChecking(true);
+    try {
+      await api.services.checkNow(vmId);
+      // Usually takes a few seconds to run, so we wait before polling
+      setTimeout(() => fetchServices(), 3000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newService.name) return;
+    
+    try {
+      await api.services.add(vmId, {
+        service_name: newService.name,
+        display_name: newService.displayName,
+        check_command: newService.command,
+      });
+      setShowAddModal(false);
+      setNewService({ name: "", displayName: "", command: "" });
+      fetchServices();
+    } catch (err) {
+      console.error("Failed to add service", err);
+    }
+  };
+
+  const handleRemove = async (serviceId: number) => {
+    if (!confirm("Remove this service from monitoring?")) return;
+    try {
+      await api.services.remove(vmId, serviceId);
+      fetchServices();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const getStatusColor = (status: string | null) => {
+    if (status === "active") return "bg-green-500/20 text-green-400 border-green-500/30";
+    if (status === "inactive") return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+    if (status === "failed") return "bg-red-500/20 text-red-400 border-red-500/30";
+    return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+  };
+
+  if (isLoading) {
+    return <div className="text-gray-400 animate-pulse">Loading services...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">Service Health</h2>
+          <p className="text-gray-400">Monitor specific systemd services running inside the VM.</p>
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={handleCheckNow}
+            disabled={isChecking}
+            className="px-4 py-2 bg-surface-700 hover:bg-surface-600 text-white rounded-lg transition border border-white/10"
+          >
+            {isChecking ? "Checking..." : "Check Now"}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg transition"
+          >
+            Add Service
+          </button>
+        </div>
+      </div>
+
+      {services.length === 0 ? (
+        <div className="p-8 text-center bg-surface-800/30 border border-white/5 rounded-xl">
+          <p className="text-gray-400 mb-4">No services are currently being monitored.</p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="text-brand-400 hover:text-brand-300 font-medium"
+          >
+            + Add your first service
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {services.map((svc) => (
+            <div key={svc.id} className="p-5 bg-surface-800/50 border border-white/10 rounded-xl relative group">
+              <button
+                onClick={() => handleRemove(svc.id)}
+                className="absolute top-4 right-4 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
+                title="Remove service"
+              >
+                ✕
+              </button>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-lg text-white">
+                  {svc.display_name || svc.service_name}
+                </h3>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(svc.status)}`}>
+                  {(svc.status || "UNKNOWN").toUpperCase()}
+                </span>
+              </div>
+              <div className="text-sm text-gray-500 font-mono">
+                {svc.service_name}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-surface-900 border border-white/10 rounded-2xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-white/5">
+              <h3 className="text-xl font-bold text-white">Add Service to Monitor</h3>
+            </div>
+            <form onSubmit={handleAdd} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Service Name (e.g., nginx)</label>
+                <input
+                  required
+                  type="text"
+                  value={newService.name}
+                  onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                  className="w-full bg-surface-800 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-brand-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Display Name (Optional)</label>
+                <input
+                  type="text"
+                  value={newService.displayName}
+                  onChange={(e) => setNewService({ ...newService, displayName: e.target.value })}
+                  className="w-full bg-surface-800 border border-white/10 rounded-lg px-4 py-2 text-white focus:border-brand-500 outline-none"
+                  placeholder="e.g., Web Server"
+                />
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 text-gray-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg"
+                >
+                  Add Service
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// NEW TAB COMPONENT: Containers (LXC)
+// ==========================================
+
+function ContainersTab({ vmId }: { vmId: number }) {
+  const [lxcData, setLxcData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchContainers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.lxc.list(vmId);
+      setLxcData(data);
+    } catch (err) {
+      console.error("Failed to fetch LXC containers:", err);
+      // Fallback
+      setLxcData({ is_proxmox: false, containers: [] });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [vmId]);
+
+  useEffect(() => {
+    fetchContainers();
+  }, [fetchContainers]);
+
+  const handleAction = async (lxcId: string, action: 'start' | 'stop' | 'restart') => {
+    if (action === 'stop' && !confirm(`Are you sure you want to stop container ${lxcId}?`)) return;
+    if (action === 'restart' && !confirm(`Are you sure you want to restart container ${lxcId}?`)) return;
+    
+    setActionLoading(`${lxcId}-${action}`);
+    try {
+      await api.lxc.action(vmId, lxcId, action);
+      // Wait a moment for Proxmox to process before refreshing
+      setTimeout(() => fetchContainers(), 2000);
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to ${action} container ${lxcId}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    if (status === "running") return "bg-green-500/20 text-green-400 border-green-500/30";
+    if (status === "stopped") return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+    return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-gray-400 space-y-4">
+        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+        <p>Connecting via SSH to detect LXC containers...</p>
+      </div>
+    );
+  }
+
+  if (!lxcData?.is_proxmox) {
+    return (
+      <div className="p-8 text-center bg-surface-800/30 border border-white/5 rounded-xl">
+        <h3 className="text-xl font-bold text-white mb-2">No LXC Provider Found</h3>
+        <p className="text-gray-400">
+          This VM does not appear to have an LXC provider installed (neither <code className="bg-black/50 px-1 py-0.5 rounded text-brand-300">pct</code>, <code className="bg-black/50 px-1 py-0.5 rounded text-brand-300">lxc</code>, nor <code className="bg-black/50 px-1 py-0.5 rounded text-brand-300">lxc-ls</code> were found). 
+          Container management is only available for VMs that act as LXC hosts.
+        </p>
+      </div>
+    );
+  }
+
+  const containers = lxcData.containers || [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">LXC Containers</h2>
+          <p className="text-gray-400">Manage LXC containers running on this host (Provider: <span className="font-mono text-brand-300">{lxcData.provider}</span>).</p>
+        </div>
+        <button
+          onClick={fetchContainers}
+          className="px-4 py-2 bg-surface-700 hover:bg-surface-600 text-white rounded-lg transition border border-white/10"
+        >
+          Refresh List
+        </button>
+      </div>
+
+      {containers.length === 0 ? (
+        <div className="p-8 text-center bg-surface-800/30 border border-white/5 rounded-xl">
+          <p className="text-gray-400">No LXC containers found on this host.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {containers.map((c: any) => (
+            <div key={c.vmid} className="p-5 bg-surface-800/50 border border-white/10 rounded-xl flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-lg text-white truncate pr-2" title={c.name}>
+                    {c.name}
+                  </h3>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(c.status)}`}>
+                    {c.status.toUpperCase()}
+                  </span>
+                </div>
+                <div className="text-sm text-gray-500 font-mono mb-6">
+                  VMID: {c.vmid}
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2 pt-4 border-t border-white/5">
+                <button
+                  onClick={() => handleAction(c.vmid, 'start')}
+                  disabled={c.status === 'running' || actionLoading !== null}
+                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
+                    c.status === 'running'
+                      ? 'bg-surface-700 text-gray-500 cursor-not-allowed'
+                      : actionLoading === `${c.vmid}-start`
+                      ? 'bg-green-500/20 text-green-400 animate-pulse'
+                      : 'bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20'
+                  }`}
+                >
+                  Start
+                </button>
+                <button
+                  onClick={() => handleAction(c.vmid, 'restart')}
+                  disabled={c.status !== 'running' || actionLoading !== null}
+                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
+                    c.status !== 'running'
+                      ? 'bg-surface-700 text-gray-500 cursor-not-allowed'
+                      : actionLoading === `${c.vmid}-restart`
+                      ? 'bg-yellow-500/20 text-yellow-400 animate-pulse'
+                      : 'bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'
+                  }`}
+                >
+                  Restart
+                </button>
+                <button
+                  onClick={() => handleAction(c.vmid, 'stop')}
+                  disabled={c.status !== 'running' || actionLoading !== null}
+                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
+                    c.status !== 'running'
+                      ? 'bg-surface-700 text-gray-500 cursor-not-allowed'
+                      : actionLoading === `${c.vmid}-stop`
+                      ? 'bg-red-500/20 text-red-400 animate-pulse'
+                      : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
+                  }`}
+                >
+                  Stop
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
