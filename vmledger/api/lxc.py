@@ -210,72 +210,137 @@ def get_lxc_resources(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_user_id)
 ):
-    """Get container resource limits and config."""
+    """Get container resource limits and live usage."""
     client = _get_ssh_client(db, vm_id, user_id)
     try:
         provider = _detect_lxc_provider(client)
         if provider == "none":
             raise HTTPException(status_code=400, detail="LXC provider not found")
-            
-        cmd = ""
-        if provider == "pct":
-            cmd = f"pct config {lxc_id}"
-        elif provider == "lxd":
-            cmd = f"lxc config show {lxc_id}"
-        elif provider == "lxc-utils":
-            cmd = f"cat /var/lib/lxc/{lxc_id}/config"
-            
-        stdout, stderr, exit_code = SSHUtils.execute_command(client, cmd)
-        if exit_code != 0:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch config: {stderr or stdout}")
-            
-        raw_config = stdout
-        resources = LxcResources()
         
-        # Parse based on provider
+        resources = LxcResources()
+        raw_config = ""
+        
+        # Build exec prefix for running commands inside the container
+        if provider == "pct":
+            exec_prefix = f"pct exec {lxc_id} --"
+        elif provider == "lxd":
+            exec_prefix = f"lxc exec {lxc_id} --"
+        else:
+            exec_prefix = f"lxc-attach -n {lxc_id} --"
+        
+        # --- Get config for raw display ---
+        if provider == "pct":
+            config_cmd = f"pct config {lxc_id}"
+        elif provider == "lxd":
+            config_cmd = f"lxc config show {lxc_id}"
+        else:
+            config_cmd = f"cat /var/lib/lxc/{lxc_id}/config 2>/dev/null || echo 'Config not available'"
+        
+        config_stdout, _, config_exit = SSHUtils.execute_command(client, config_cmd)
+        if config_exit == 0:
+            raw_config = config_stdout
+        
+        # --- Parse configured limits from config ---
         if provider == "pct":
             for line in raw_config.split('\n'):
+                line = line.strip()
                 if line.startswith('cores:'):
-                    try: resources.cpu_cores = int(line.split(':')[1].strip())
+                    try: resources.cpu_cores = int(line.split(':',1)[1].strip())
                     except: pass
                 elif line.startswith('memory:'):
-                    try: resources.memory_mb = int(line.split(':')[1].strip())
+                    try: resources.memory_mb = int(line.split(':',1)[1].strip())
                     except: pass
                 elif line.startswith('swap:'):
-                    try: resources.swap_mb = int(line.split(':')[1].strip())
+                    try: resources.swap_mb = int(line.split(':',1)[1].strip())
                     except: pass
                 elif line.startswith('rootfs:'):
-                    # example: rootfs: local-lvm:vm-100-disk-0,size=8G
                     try:
-                        size_str = line.split('size=')[1].strip()
-                        if size_str.endswith('G'):
+                        size_str = line.split('size=')[1].strip().rstrip(',')
+                        if size_str.upper().endswith('G'):
                             resources.disk_gb = float(size_str[:-1])
-                        elif size_str.endswith('M'):
+                        elif size_str.upper().endswith('M'):
                             resources.disk_gb = float(size_str[:-1]) / 1024
+                        elif size_str.upper().endswith('T'):
+                            resources.disk_gb = float(size_str[:-1]) * 1024
                     except: pass
+                    
         elif provider == "lxd":
+            # LXD config is YAML. Parse limits from nested config section.
             for line in raw_config.split('\n'):
                 line = line.strip()
                 if line.startswith('limits.cpu:'):
-                    try: resources.cpu_cores = int(line.split(':')[1].strip())
+                    try: 
+                        val = line.split(':', 1)[1].strip().strip('"').strip("'")
+                        resources.cpu_cores = int(val)
                     except: pass
                 elif line.startswith('limits.memory:'):
                     try:
-                        mem_str = line.split(':')[1].strip()
-                        if mem_str.endswith('MB'): resources.memory_mb = int(mem_str[:-2])
-                        elif mem_str.endswith('GB'): resources.memory_mb = int(mem_str[:-2]) * 1024
+                        mem_str = line.split(':', 1)[1].strip().strip('"').strip("'")
+                        if mem_str.upper().endswith('MB'):
+                            resources.memory_mb = int(mem_str[:-2])
+                        elif mem_str.upper().endswith('GB'):
+                            resources.memory_mb = int(float(mem_str[:-2]) * 1024)
+                        elif mem_str.upper().endswith('MIB'):
+                            resources.memory_mb = int(mem_str[:-3])
+                        elif mem_str.upper().endswith('GIB'):
+                            resources.memory_mb = int(float(mem_str[:-3]) * 1024)
+                        else:
+                            # Assume bytes
+                            resources.memory_mb = int(mem_str) // (1024 * 1024)
                     except: pass
-        elif provider == "lxc-utils":
-            for line in raw_config.split('\n'):
-                if line.startswith('lxc.cgroup2.cpu.max'):
-                    # format: lxc.cgroup2.cpu.max = 100000 100000 (roughly 1 core)
-                    pass # complex parsing ignored for now
-                elif line.startswith('lxc.cgroup2.memory.max'):
+        
+        # --- Fallback: query live values from inside the container ---
+        # CPU cores
+        if resources.cpu_cores is None:
+            stdout, _, exit_code = SSHUtils.execute_command(client, f"{exec_prefix} nproc 2>/dev/null || {exec_prefix} grep -c ^processor /proc/cpuinfo")
+            if exit_code == 0 and stdout.strip():
+                try: resources.cpu_cores = int(stdout.strip().split('\n')[-1])
+                except: pass
+        
+        # Memory
+        if resources.memory_mb is None:
+            stdout, _, exit_code = SSHUtils.execute_command(client, f"{exec_prefix} free -m")
+            if exit_code == 0 and stdout.strip():
+                for line in stdout.strip().split('\n'):
+                    if line.lower().startswith('mem:'):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try: resources.memory_mb = int(parts[1])
+                            except: pass
+                            break
+        
+        # Swap
+        if resources.swap_mb is None:
+            stdout, _, exit_code = SSHUtils.execute_command(client, f"{exec_prefix} free -m")
+            if exit_code == 0 and stdout.strip():
+                for line in stdout.strip().split('\n'):
+                    if line.lower().startswith('swap:'):
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try: resources.swap_mb = int(parts[1])
+                            except: pass
+                            break
+        
+        # Disk
+        if resources.disk_gb is None:
+            stdout, _, exit_code = SSHUtils.execute_command(client, f"{exec_prefix} df -BG / 2>/dev/null | tail -1")
+            if exit_code == 0 and stdout.strip():
+                parts = stdout.strip().split()
+                if len(parts) >= 2:
                     try:
-                        val = line.split('=')[1].strip()
-                        resources.memory_mb = int(val) // (1024 * 1024)
+                        size_str = parts[1].rstrip('G')
+                        resources.disk_gb = float(size_str)
                     except: pass
-                    
+            # Also try to get used disk
+            stdout2, _, exit_code2 = SSHUtils.execute_command(client, f"{exec_prefix} df -BG / 2>/dev/null | tail -1")
+            if exit_code2 == 0 and stdout2.strip():
+                parts2 = stdout2.strip().split()
+                if len(parts2) >= 3:
+                    try:
+                        used_str = parts2[2].rstrip('G')
+                        resources.disk_used_gb = float(used_str)
+                    except: pass
+        
         return LxcResourcesResponse(
             container_id=lxc_id,
             provider=provider,
