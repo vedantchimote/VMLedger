@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth, useLogout } from "@/lib/hooks/use-auth";
-import { useDashboard } from "@/lib/hooks/use-dashboard";
+import { useDashboard, useUptimeSummary } from "@/lib/hooks/use-dashboard";
 import { useVMSearch, useDeleteVM } from "@/lib/hooks/use-vms";
 import type { VM } from "@/types/api";
 import { KanbanCard } from "./KanbanCard";
 import GlobalNotificationBell from "@/components/GlobalNotificationBell";
+import { UptimeBadge } from "@/components/UptimeBadge";
 
 // Custom hook for debounced value
 function useDebounce<T>(value: T, delay: number): T {
@@ -70,6 +71,15 @@ export default function DashboardPage() {
     error,
     isFetching,
   } = useDashboard();
+  
+  const { data: uptimeData } = useUptimeSummary("30d");
+  const uptimeMap = useMemo(() => {
+    const map = new Map();
+    if (uptimeData) {
+      uptimeData.forEach(u => map.set(u.vm_id, u));
+    }
+    return map;
+  }, [uptimeData]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -219,26 +229,16 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-surface-950/60 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-surface-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between items-center h-14">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-lg shadow-brand-500/20">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
-                  />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-lg shadow-brand-500/20">
+                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-white">
+              <h1 className="text-lg font-bold tracking-tight text-white">
                 VM<span className="text-brand-400">Ledger</span>
               </h1>
               {isFetching && !isLoading && (
@@ -251,7 +251,7 @@ export default function DashboardPage() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <GlobalNotificationBell />
               {selectedVms.length > 0 && (
                 <button
@@ -265,26 +265,14 @@ export default function DashboardPage() {
                   {isDeleting ? "Deleting..." : `Remove (${selectedVms.length})`}
                 </button>
               )}
-              <Link href="/vms/new" className="btn-primary">
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
+              <Link href="/vms/new" className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white text-xs font-semibold shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30 transition-all hover:brightness-110">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                 Register VM
               </Link>
               <button
                 onClick={handleLogout}
                 disabled={logoutMutation.isPending}
-                className="btn-secondary"
+                className="inline-flex items-center px-3.5 py-2 rounded-lg bg-surface-800 border border-white/5 text-gray-300 hover:text-white hover:bg-surface-700 transition-all text-xs font-semibold"
               >
                 {logoutMutation.isPending ? "Signing out..." : "Sign out"}
               </button>
@@ -294,17 +282,17 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 animate-fade-in">
         {/* Search and Filters Section */}
-        <div className="mb-10 space-y-6">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col md:flex-row gap-3 justify-between items-start md:items-center">
             <div>
-              <h2 className="text-3xl font-bold text-white tracking-tight mb-1">
+              <h2 className="text-xl font-bold text-white tracking-tight">
                 {debouncedSearchQuery
                   ? `Search Results (${displayVms.length})`
                   : `Infrastructure (${displayVms.length})`}
               </h2>
-              <p className="text-sm text-gray-400">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Manage and monitor your virtual machines in real-time.
               </p>
             </div>
@@ -595,15 +583,15 @@ export default function DashboardPage() {
         {!isLoading && !isError && displayVms && displayVms.length > 0 && (
           <>
             {viewMode === "grid" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {displayVms.map((vm: VM, idx) => (
                   <div
                     key={vm.id}
-                    className="glass-card group flex flex-col h-full"
+                    className="glass-card group flex flex-col h-full hover:border-white/10 transition-all"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     {/* VM Card Header */}
-                    <div className="p-6 pb-5 flex-grow relative">
+                    <div className="p-5 pb-4 flex-grow relative">
                       <div className="flex items-start justify-between mb-4 gap-4">
                         <div className="flex-1 min-w-0 flex items-start gap-3">
                           <input 
@@ -636,6 +624,12 @@ export default function DashboardPage() {
                             DNS Drift
                           </span>
                         )}
+                        {uptimeMap.get(vm.id) && (
+                          <UptimeBadge 
+                            uptimePercent={uptimeMap.get(vm.id).uptime_percent} 
+                            slaTier={uptimeMap.get(vm.id).sla_tier} 
+                          />
+                        )}
                       </div>
                       {/* Tags */}
                       {vm.tags && vm.tags.length > 0 && (
@@ -651,7 +645,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* VM Metrics */}
-                    <div className="px-6 py-5 bg-surface-900/30 border-y border-white/5 space-y-4 flex-grow">
+                    <div className="px-5 py-4 bg-surface-900/30 border-y border-white/5 space-y-3 flex-grow">
                       <div>
                         <div className="flex justify-between items-center mb-1.5">
                           <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">CPU</span>
@@ -694,7 +688,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="px-6 py-4 flex items-center justify-between">
+                    <div className="px-5 py-3 flex items-center justify-between">
                       <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
                         {vm.is_reachable ? "Active " : "Seen "} {formatLastSeen(vm.last_seen)}
                       </div>
