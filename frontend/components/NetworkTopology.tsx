@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ReactFlow, Background, Controls, Node, Edge, Position, Handle } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -52,6 +52,7 @@ interface NetworkTopologyProps {
 }
 
 export function NetworkTopology({ vmId }: NetworkTopologyProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['network-topology', vmId],
     queryFn: () => api.network.getTopology(vmId),
@@ -157,19 +158,41 @@ export function NetworkTopology({ vmId }: NetworkTopologyProps) {
     );
   }
 
-  return (
-    <div className="h-[600px] w-full border border-white/10 rounded-xl overflow-hidden bg-surface-900/50">
+  const content = (
+    <div className={`${isFullscreen ? 'fixed inset-0 z-[9999] h-screen w-screen rounded-none bg-surface-900/95 backdrop-blur-xl' : 'relative h-[600px] w-full rounded-xl bg-surface-900/50'} border border-white/10 overflow-hidden transition-all duration-300`}>
+      <button 
+        onClick={() => setIsFullscreen(!isFullscreen)}
+        className="absolute top-6 left-6 z-10 px-3 py-1.5 bg-surface-800/80 border border-white/10 rounded-md text-xs font-medium text-gray-300 hover:text-white hover:bg-surface-700 shadow-lg backdrop-blur-md transition-colors flex items-center gap-1.5"
+      >
+        {isFullscreen ? (
+          <>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            Exit Fullscreen
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            Fullscreen
+          </>
+        )}
+      </button>
+
       <ReactFlow 
+        key={isFullscreen ? 'fullscreen' : 'normal'}
         nodes={nodes} 
         edges={edges} 
         nodeTypes={nodeTypes}
         fitView
         className="bg-surface-900"
+        proOptions={{ hideAttribution: true }}
       >
         <Background color="#374151" gap={16} size={1} />
-        <Controls className="bg-surface-800 border-white/10 fill-white text-white" />
+        <Controls 
+          position="bottom-right"
+          className="!absolute !bottom-6 !right-8 !left-auto !bg-surface-800 !border-white/10 !shadow-lg [&>button]:!bg-surface-800 [&>button]:!border-b-white/5 [&>button:hover]:!bg-surface-700 [&_svg]:!fill-gray-300" 
+        />
       </ReactFlow>
-      <div className="absolute top-4 right-4 bg-surface-800/80 p-3 rounded-lg border border-white/10 backdrop-blur-md text-xs z-10">
+      <div className="absolute top-6 right-8 bg-surface-800/80 p-3 rounded-lg border border-white/10 backdrop-blur-md text-xs z-10 shadow-lg">
         <div className="font-bold text-gray-300 mb-2">Legend</div>
         <div className="flex items-center gap-2 mb-1"><span className="w-3 h-3 bg-brand-500/20 border border-brand-500 block rounded-sm"></span> Host VM</div>
         <div className="flex items-center gap-2 mb-1"><span className="w-3 h-3 bg-purple-500/20 border border-purple-500 block rounded-sm"></span> Bridge / Switch</div>
@@ -178,4 +201,22 @@ export function NetworkTopology({ vmId }: NetworkTopologyProps) {
       </div>
     </div>
   );
+
+  if (isFullscreen && typeof document !== 'undefined') {
+    import('react-dom').then((ReactDOM) => {
+      // Using dynamic import for react-dom to avoid SSR issues with document
+    });
+    const { createPortal } = require('react-dom');
+    return (
+      <>
+        {/* Placeholder to preserve the page layout when the map is popped out */}
+        <div className="h-[600px] w-full border border-white/5 rounded-xl bg-surface-800/20 animate-pulse flex items-center justify-center text-gray-500">
+          Network Topology is open in Fullscreen
+        </div>
+        {createPortal(content, document.body)}
+      </>
+    );
+  }
+
+  return content;
 }
