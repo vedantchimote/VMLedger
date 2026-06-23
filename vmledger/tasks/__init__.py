@@ -15,8 +15,10 @@ Requirements: 4.1, 5.6, 8.1, 9.1-9.5, 15.1-15.6
 
 import logging
 import socket
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
+from sqlalchemy import func, cast, Integer
+from sqlalchemy.dialects.postgresql import insert
 
 from celery import group
 from sqlalchemy.orm import Session
@@ -30,6 +32,8 @@ from vmledger.services.metric_collector_service import MetricCollectorService, M
 from vmledger.services.alert_handler_service import AlertHandlerService
 from vmledger.services.data_cleanup_service import DataCleanupService
 from vmledger.services.credential_manager import CredentialManager
+from vmledger.models.uptime_summary import UptimeDailySummary
+from vmledger.models.ping_result import PingResult
 
 
 logger = logging.getLogger(__name__)
@@ -320,6 +324,50 @@ def schedule_metric_collection():
             'elapsed_seconds': elapsed
         }
 
+
+@celery_app.task
+def rollup_daily_uptime():
+    """
+    Rollup previous day's ping results into the uptime summary table.
+    Should run early morning (e.g., 1 AM UTC) before data cleanup.
+    """
+    logger.info("Starting daily uptime rollup task")
+    yesterday = (datetime.utcnow().date() - timedelta(days=1))
+    
+    try:
+        with get_db_context() as db:
+            # Query aggregates for yesterday
+            stats = db.query(
+                PingResult.vm_id,
+                func.count(PingResult.id).label('total'),
+                func.sum(cast(PingResult.success, Integer)).label('success'),
+                func.avg(PingResult.response_time_ms).label('avg_latency'),
+                func.max(PingResult.response_time_ms).label('max_latency'),
+                func.min(PingResult.response_time_ms).label('min_latency')
+            ).filter(
+                func.date(PingResult.timestamp) == yesterday
+            ).group_by(PingResult.vm_id).all()
+            
+            inserted = 0
+            for stat in stats:
+                stmt = insert(UptimeDailySummary).values(
+                    vm_id=stat.vm_id,
+                    date=yesterday,
+                    total_checks=stat.total,
+                    successful_checks=int(stat.success or 0),
+                    avg_latency_ms=stat.avg_latency,
+                    max_latency_ms=stat.max_latency,
+                    min_latency_ms=stat.min_latency
+                ).on_conflict_do_nothing(
+                    index_elements=['vm_id', 'date']
+                )
+                db.execute(stmt)
+                inserted += 1
+                
+            db.commit()
+            logger.info(f"Completed uptime rollup for {inserted} VMs for {yesterday}")
+    except Exception as e:
+        logger.error(f"Failed to rollup daily uptime: {e}")
 
 @celery_app.task
 def cleanup_historical_data():

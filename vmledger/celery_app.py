@@ -72,6 +72,10 @@ celery_app.conf.beat_schedule = {
             "expires": settings.metrics_interval_seconds - 5
         }
     },
+    "rollup-daily-uptime": {
+        "task": "vmledger.tasks.rollup_daily_uptime",
+        "schedule": crontab(hour=1, minute=0),  # Daily at 1 AM UTC
+    },
     "cleanup-old-data": {
         "task": "vmledger.tasks.cleanup_historical_data",
         "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM UTC

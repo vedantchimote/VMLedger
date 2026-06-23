@@ -431,6 +431,43 @@ async def create_vm(
             }
         )
 
+@router.get(
+    "/tools/resolve",
+    status_code=status.HTTP_200_OK,
+    summary="Resolve hostname from IP",
+    description="Automatically detect hostname from IP address"
+)
+async def resolve_ip(
+    request: Request,
+    ip: str = Query(..., description="IP address to resolve")
+) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", "unknown")
+    try:
+        import asyncio
+        import socket
+        hostname, _, _ = await asyncio.to_thread(socket.gethostbyaddr, ip)
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": True,
+                "data": {"hostname": hostname},
+                "request_id": request_id
+            }
+        )
+    except Exception as e:
+        logger.debug(f"Failed to resolve hostname for IP {ip}: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "success": False,
+                "data": {"hostname": None},
+                "error": {
+                    "code": "RESOLUTION_FAILED",
+                    "message": "Could not resolve hostname for IP"
+                },
+                "request_id": request_id
+            }
+        )
 
 @router.get(
     "/alerts",

@@ -6,7 +6,7 @@ import logging
 import re
 from typing import List, Dict, Any
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Path
 
 from vmledger.database import get_db
 from sqlalchemy.orm import Session
@@ -26,6 +26,25 @@ class LxcContainer(BaseModel):
 
 class LxcActionRequest(BaseModel):
     action: str  # 'start', 'stop', 'restart'
+
+class LxcResources(BaseModel):
+    cpu_cores: int | None = None
+    memory_mb: int | None = None
+    swap_mb: int | None = None
+    disk_gb: float | None = None
+    disk_used_gb: float | None = None
+
+class LxcResourcesResponse(BaseModel):
+    container_id: str
+    provider: str
+    resources: LxcResources
+    raw_config: str
+
+class UpdateLxcResourcesRequest(BaseModel):
+    cpu_cores: int | None = None
+    memory_mb: int | None = None
+    swap_mb: int | None = None
+    disk_gb: float | None = None
 
 
 def get_user_id(request: Request) -> int:
@@ -183,3 +202,136 @@ def perform_lxc_action(
         
     finally:
         client.close()
+
+@router.get("/{vm_id}/lxc/{lxc_id}/resources", response_model=LxcResourcesResponse)
+def get_lxc_resources(
+    vm_id: int,
+    lxc_id: str = Path(..., regex=r"^[a-zA-Z0-9_-]+$"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_user_id)
+):
+    """Get container resource limits and config."""
+    client = _get_ssh_client(db, vm_id, user_id)
+    try:
+        provider = _detect_lxc_provider(client)
+        if provider == "none":
+            raise HTTPException(status_code=400, detail="LXC provider not found")
+            
+        cmd = ""
+        if provider == "pct":
+            cmd = f"pct config {lxc_id}"
+        elif provider == "lxd":
+            cmd = f"lxc config show {lxc_id}"
+        elif provider == "lxc-utils":
+            cmd = f"cat /var/lib/lxc/{lxc_id}/config"
+            
+        stdout, stderr, exit_code = SSHUtils.execute_command(client, cmd)
+        if exit_code != 0:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch config: {stderr or stdout}")
+            
+        raw_config = stdout
+        resources = LxcResources()
+        
+        # Parse based on provider
+        if provider == "pct":
+            for line in raw_config.split('\n'):
+                if line.startswith('cores:'):
+                    try: resources.cpu_cores = int(line.split(':')[1].strip())
+                    except: pass
+                elif line.startswith('memory:'):
+                    try: resources.memory_mb = int(line.split(':')[1].strip())
+                    except: pass
+                elif line.startswith('swap:'):
+                    try: resources.swap_mb = int(line.split(':')[1].strip())
+                    except: pass
+                elif line.startswith('rootfs:'):
+                    # example: rootfs: local-lvm:vm-100-disk-0,size=8G
+                    try:
+                        size_str = line.split('size=')[1].strip()
+                        if size_str.endswith('G'):
+                            resources.disk_gb = float(size_str[:-1])
+                        elif size_str.endswith('M'):
+                            resources.disk_gb = float(size_str[:-1]) / 1024
+                    except: pass
+        elif provider == "lxd":
+            for line in raw_config.split('\n'):
+                line = line.strip()
+                if line.startswith('limits.cpu:'):
+                    try: resources.cpu_cores = int(line.split(':')[1].strip())
+                    except: pass
+                elif line.startswith('limits.memory:'):
+                    try:
+                        mem_str = line.split(':')[1].strip()
+                        if mem_str.endswith('MB'): resources.memory_mb = int(mem_str[:-2])
+                        elif mem_str.endswith('GB'): resources.memory_mb = int(mem_str[:-2]) * 1024
+                    except: pass
+        elif provider == "lxc-utils":
+            for line in raw_config.split('\n'):
+                if line.startswith('lxc.cgroup2.cpu.max'):
+                    # format: lxc.cgroup2.cpu.max = 100000 100000 (roughly 1 core)
+                    pass # complex parsing ignored for now
+                elif line.startswith('lxc.cgroup2.memory.max'):
+                    try:
+                        val = line.split('=')[1].strip()
+                        resources.memory_mb = int(val) // (1024 * 1024)
+                    except: pass
+                    
+        return LxcResourcesResponse(
+            container_id=lxc_id,
+            provider=provider,
+            resources=resources,
+            raw_config=raw_config
+        )
+    finally:
+        client.close()
+
+@router.put("/{vm_id}/lxc/{lxc_id}/resources")
+def update_lxc_resources(
+    vm_id: int,
+    request_data: UpdateLxcResourcesRequest,
+    lxc_id: str = Path(..., regex=r"^[a-zA-Z0-9_-]+$"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_user_id)
+):
+    """Update container resource limits."""
+    client = _get_ssh_client(db, vm_id, user_id)
+    try:
+        provider = _detect_lxc_provider(client)
+        if provider == "none":
+            raise HTTPException(status_code=400, detail="LXC provider not found")
+        if provider == "lxc-utils":
+            raise HTTPException(status_code=400, detail="Editing limits not supported for pure LXC via this API")
+            
+        cmds = []
+        if provider == "pct":
+            if request_data.cpu_cores is not None:
+                cmds.append(f"pct set {lxc_id} -cores {request_data.cpu_cores}")
+            if request_data.memory_mb is not None:
+                cmds.append(f"pct set {lxc_id} -memory {request_data.memory_mb}")
+            if request_data.swap_mb is not None:
+                cmds.append(f"pct set {lxc_id} -swap {request_data.swap_mb}")
+            if request_data.disk_gb is not None:
+                # pct resize {id} rootfs +5G or absolute? pct resize {id} rootfs {size}G
+                cmds.append(f"pct resize {lxc_id} rootfs {request_data.disk_gb}G")
+                
+        elif provider == "lxd":
+            if request_data.cpu_cores is not None:
+                cmds.append(f"lxc config set {lxc_id} limits.cpu {request_data.cpu_cores}")
+            if request_data.memory_mb is not None:
+                cmds.append(f"lxc config set {lxc_id} limits.memory {request_data.memory_mb}MB")
+            if request_data.disk_gb is not None:
+                cmds.append(f"lxc config device set {lxc_id} root size {request_data.disk_gb}GB")
+                
+        if not cmds:
+            return {"success": True, "message": "No changes requested"}
+            
+        full_cmd = " && ".join(cmds)
+        stdout, stderr, exit_code = SSHUtils.execute_command(client, full_cmd)
+        
+        if exit_code != 0:
+            raise HTTPException(status_code=500, detail=f"Failed to apply limits: {stderr or stdout}")
+            
+        return {"success": True, "message": "Resources updated successfully"}
+    finally:
+        client.close()
+
