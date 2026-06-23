@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
+import { dashboardKeys } from './use-dashboard';
 import type { VMCreateRequest, VMUpdateRequest } from '@/types/api';
 
 /**
@@ -71,6 +72,7 @@ export function useCreateVM() {
     onSuccess: () => {
       // Invalidate and refetch VM list
       queryClient.invalidateQueries({ queryKey: vmKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
   });
 }
@@ -88,6 +90,7 @@ export function useUpdateVM() {
       // Invalidate specific VM and list
       queryClient.invalidateQueries({ queryKey: vmKeys.detail(variables.vmId) });
       queryClient.invalidateQueries({ queryKey: vmKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
   });
 }
@@ -103,6 +106,8 @@ export function useDeleteVM() {
     onSuccess: () => {
       // Invalidate VM list
       queryClient.invalidateQueries({ queryKey: vmKeys.lists() });
+      // Invalidate dashboard to reflect deletion immediately
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
   });
 }

@@ -6,9 +6,10 @@ import { api } from '@/lib/api-client';
  */
 export const monitoringKeys = {
   all: ['monitoring'] as const,
-  metrics: (vmId: number) => [...monitoringKeys.all, 'metrics', vmId] as const,
-  ping: (vmId: number) => [...monitoringKeys.all, 'ping', vmId] as const,
+  metrics: (vmId: number, limit?: number) => [...monitoringKeys.all, 'metrics', vmId, limit] as const,
+  ping: (vmId: number, limit?: number) => [...monitoringKeys.all, 'ping', vmId, limit] as const,
   status: (vmId: number) => [...monitoringKeys.all, 'status', vmId] as const,
+  uptime: (vmId: number, period: string) => [...monitoringKeys.all, 'uptime', vmId, period] as const,
 };
 
 /**
@@ -47,5 +48,17 @@ export function useVMStatus(vmId: number) {
     enabled: !!vmId,
     // Refetch every 30 seconds for real-time updates
     refetchInterval: 30 * 1000,
+  });
+}
+
+/**
+ * Hook to fetch uptime SLA for a specific VM
+ */
+export function useVmUptime(vmId: number, period: string = "30d") {
+  return useQuery({
+    queryKey: monitoringKeys.uptime(vmId, period),
+    queryFn: () => api.uptime.getVmUptime(vmId, period),
+    enabled: !!vmId,
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 mins
   });
 }

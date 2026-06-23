@@ -7,6 +7,7 @@ import { api, tokenManager } from '@/lib/api-client';
 export const dashboardKeys = {
   all: ['dashboard'] as const,
   summary: () => [...dashboardKeys.all, 'summary'] as const,
+  uptime: (period: string) => [...dashboardKeys.all, 'uptime', period] as const,
 };
 
 /**
@@ -28,5 +29,18 @@ export function useDashboard() {
       if (error?.response?.status === 401) return false;
       return failureCount < 3;
     },
+  });
+}
+
+/**
+ * Hook to fetch uptime summary for all VMs
+ */
+export function useUptimeSummary(period: string = "30d") {
+  return useQuery({
+    queryKey: dashboardKeys.uptime(period),
+    queryFn: () => api.uptime.getUptimeSummary(period),
+    enabled: tokenManager.isAuthenticated(),
+    refetchInterval: 60 * 60 * 1000, // Refresh every hour
+    placeholderData: (previousData: any) => previousData,
   });
 }

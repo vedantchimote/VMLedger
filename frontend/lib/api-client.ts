@@ -19,6 +19,12 @@ import type {
   ServiceWithStatus,
   ServiceCreateRequest,
   LxcResponse,
+  BatchUptimeResponse,
+  UptimeStatsResponse,
+  ProcessListResponse,
+  LxcResourcesResponse,
+  UpdateLxcResourcesRequest,
+  TopologyResponse,
 } from "@/types/api";
 
 // Token storage keys
@@ -325,6 +331,10 @@ export const api = {
           : undefined,
       }));
     },
+    async resolveHostname(ip: string): Promise<{ hostname: string }> {
+      const response = await apiClient.get<ApiResponse<{ hostname: string }>>(`/vms/tools/resolve?ip=${encodeURIComponent(ip)}`);
+      return response.data.data as { hostname: string };
+    },
   },
 
   // Monitoring Data
@@ -480,8 +490,49 @@ export const api = {
       const response = await apiClient.get<LxcResponse>(`/vms/${vmId}/lxc`);
       return response.data;
     },
-    async action(vmId: number, lxcId: string, action: 'start' | 'stop' | 'restart'): Promise<{success: boolean, message: string}> {
-      const response = await apiClient.post<{success: boolean, message: string}>(`/vms/${vmId}/lxc/${lxcId}/action`, { action });
+    async performLxcAction(vmId: number, lxcId: string, action: string): Promise<{ success: boolean; message: string }> {
+      const response = await apiClient.post(`vms/${vmId}/lxc/${lxcId}/action`, { action });
+      return response.data;
+    },
+    async getResources(vmId: number, lxcId: string): Promise<LxcResourcesResponse> {
+      const response = await apiClient.get(`vms/${vmId}/lxc/${lxcId}/resources`);
+      return response.data;
+    },
+    async updateResources(vmId: number, lxcId: string, data: UpdateLxcResourcesRequest): Promise<{ success: boolean; message: string }> {
+      const response = await apiClient.put(`vms/${vmId}/lxc/${lxcId}/resources`, data);
+      return response.data;
+    }
+  },
+
+  // Uptime tracking
+  uptime: {
+    async getUptimeSummary(period: string = "30d"): Promise<BatchUptimeResponse[]> {
+      const response = await apiClient.get(`vms/uptime/summary?period=${period}`);
+      return response.data;
+    },
+
+    async getVmUptime(vmId: number, period: string = "30d"): Promise<UptimeStatsResponse> {
+      const response = await apiClient.get(`vms/${vmId}/uptime?period=${period}`);
+      return response.data;
+    },
+  },
+
+  // Processes
+  processes: {
+    async list(vmId: number, lxcId: string, sort: string = "cpu", limit: number = 50): Promise<ProcessListResponse> {
+      const response = await apiClient.get(`vms/${vmId}/lxc/${lxcId}/processes`, { params: { sort, limit } });
+      return response.data;
+    },
+    async kill(vmId: number, lxcId: string, pid: number, signal: string = "TERM"): Promise<{success: boolean, message: string}> {
+      const response = await apiClient.post(`vms/${vmId}/lxc/${lxcId}/processes/${pid}/kill`, { signal });
+      return response.data;
+    }
+  },
+
+  // Network
+  network: {
+    async getTopology(vmId: number): Promise<TopologyResponse> {
+      const response = await apiClient.get(`/vms/${vmId}/network/topology`);
       return response.data;
     }
   }

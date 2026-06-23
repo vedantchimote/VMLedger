@@ -194,5 +194,93 @@ export interface LxcContainer {
 
 export interface LxcResponse {
   is_proxmox: boolean;
+  provider: string;
   containers: LxcContainer[];
+}
+
+export interface UptimeDailyBreakdown {
+  date: string;
+  uptime_percent: number;
+  checks: number;
+}
+
+export interface UptimeStatsResponse {
+  vm_id: number;
+  period: string;
+  uptime_percent: number;
+  sla_tier: string;
+  total_checks: number;
+  successful_checks: number;
+  failed_checks: number;
+  avg_latency_ms: number | null;
+  max_latency_ms: number | null;
+  min_latency_ms: number | null;
+  daily_breakdown: UptimeDailyBreakdown[];
+}
+
+export interface BatchUptimeResponse {
+  vm_id: number;
+  uptime_percent: number;
+  sla_tier: string;
+}
+
+export interface ProcessInfo {
+  pid: number;
+  user: string;
+  cpu_percent: number;
+  mem_percent: number;
+  vsz_kb: number;
+  rss_kb: number;
+  stat: string;
+  started: string;
+  time: string;
+  command: string;
+}
+
+export interface ProcessListResponse {
+  container_id: string;
+  process_count: number;
+  processes: ProcessInfo[];
+}
+
+export interface LxcResources {
+  cpu_cores?: number;
+  memory_mb?: number;
+  swap_mb?: number;
+  disk_gb?: number;
+  disk_used_gb?: number;
+}
+
+export interface LxcResourcesResponse {
+  container_id: string;
+  provider: string;
+  resources: LxcResources;
+  raw_config: string;
+}
+
+export interface UpdateLxcResourcesRequest {
+  cpu_cores?: number;
+  memory_mb?: number;
+  swap_mb?: number;
+  disk_gb?: number;
+}
+
+export interface TopologyNode {
+  id: string;
+  type: string;
+  label: string;
+  ip: string;
+  status: string;
+}
+
+export interface TopologyEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+}
+
+export interface TopologyResponse {
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
 }
