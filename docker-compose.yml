@@ -82,6 +82,10 @@ services:
       # CORS Settings
       CORS_ORIGINS: http://localhost:3000,http://localhost:8000
       CORS_ALLOW_CREDENTIALS: "True"
+    dns:
+      - 10.208.192.11
+      - 10.208.192.12
+      - 8.8.8.8
     ports:
       - "8000:8000"
     depends_on:
