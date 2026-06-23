@@ -1982,7 +1982,9 @@ function ContainersTab({ vmId }: { vmId: number }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {containers.map((c: any) => (
-            <div key={c.vmid} className="p-5 bg-surface-800/50 border border-white/10 rounded-xl flex flex-col justify-between transition-all">
+            <div key={c.vmid} className={`p-5 bg-surface-800/50 border border-white/10 rounded-xl flex flex-col justify-between transition-all ${
+              (expandedContainer?.id === c.vmid) ? 'col-span-full' : ''
+            }`}>
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-lg text-white truncate pr-2" title={c.name}>
