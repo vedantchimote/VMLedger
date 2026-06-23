@@ -1999,83 +1999,114 @@ function ContainersTab({ vmId }: { vmId: number }) {
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2 pt-4 border-t border-white/5">
-                <button
-                  onClick={() => handleAction(c.vmid, 'start')}
-                  disabled={c.status === 'running' || actionLoading !== null}
-                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
-                    c.status === 'running'
-                      ? 'bg-surface-700 text-gray-500 cursor-not-allowed'
-                      : actionLoading === `${c.vmid}-start`
-                      ? 'bg-green-500/20 text-green-400 animate-pulse'
-                      : 'bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20'
-                  }`}
-                >
-                  Start
-                </button>
-                <button
-                  onClick={() => handleAction(c.vmid, 'restart')}
-                  disabled={c.status !== 'running' || actionLoading !== null}
-                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
-                    c.status !== 'running'
-                      ? 'bg-surface-700 text-gray-500 cursor-not-allowed'
-                      : actionLoading === `${c.vmid}-restart`
-                      ? 'bg-yellow-500/20 text-yellow-400 animate-pulse'
-                      : 'bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/20'
-                  }`}
-                >
-                  Restart
-                </button>
-                <button
-                  onClick={() => handleAction(c.vmid, 'stop')}
-                  disabled={c.status !== 'running' || actionLoading !== null}
-                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
-                    c.status !== 'running'
-                      ? 'bg-surface-700 text-gray-500 cursor-not-allowed'
-                      : actionLoading === `${c.vmid}-stop`
-                      ? 'bg-red-500/20 text-red-400 animate-pulse'
-                      : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
-                  }`}
-                >
-                  Stop
-                </button>
-                <button
-                  onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' ? null : {id: c.vmid, view: 'processes'})}
-                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
-                    expandedContainer?.id === c.vmid && expandedContainer.view === 'processes'
-                      ? 'bg-brand-500/20 text-brand-400 border border-brand-500/20'
-                      : 'bg-surface-700 hover:bg-surface-600 text-gray-300 border border-white/5'
-                  }`}
-                >
-                  Processes
-                </button>
-                <button
-                  onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'resources' ? null : {id: c.vmid, view: 'resources'})}
-                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
-                    expandedContainer?.id === c.vmid && expandedContainer.view === 'resources'
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
-                      : 'bg-surface-700 hover:bg-surface-600 text-gray-300 border border-white/5'
-                  }`}
-                >
-                  Resources
-                </button>
+              <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-white/5">
+                <div className="flex w-full md:w-auto gap-2">
+                  <button
+                    onClick={() => handleAction(c.vmid, 'start')}
+                    disabled={c.status === 'running' || actionLoading !== null}
+                    className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition ${
+                      c.status === 'running'
+                        ? 'bg-surface-800 text-gray-600 cursor-not-allowed border border-white/5'
+                        : actionLoading === `${c.vmid}-start`
+                        ? 'bg-green-500/20 text-green-400 animate-pulse border border-green-500/20'
+                        : 'bg-surface-700 hover:bg-green-500/20 hover:text-green-400 text-gray-300 border border-white/5 hover:border-green-500/30'
+                    }`}
+                    title="Start Container"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Start
+                  </button>
+                  <button
+                    onClick={() => handleAction(c.vmid, 'restart')}
+                    disabled={c.status !== 'running' || actionLoading !== null}
+                    className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition ${
+                      c.status !== 'running'
+                        ? 'bg-surface-800 text-gray-600 cursor-not-allowed border border-white/5'
+                        : actionLoading === `${c.vmid}-restart`
+                        ? 'bg-yellow-500/20 text-yellow-400 animate-pulse border border-yellow-500/20'
+                        : 'bg-surface-700 hover:bg-yellow-500/20 hover:text-yellow-400 text-gray-300 border border-white/5 hover:border-yellow-500/30'
+                    }`}
+                    title="Restart Container"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Restart
+                  </button>
+                  <button
+                    onClick={() => handleAction(c.vmid, 'stop')}
+                    disabled={c.status !== 'running' || actionLoading !== null}
+                    className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition ${
+                      c.status !== 'running'
+                        ? 'bg-surface-800 text-gray-600 cursor-not-allowed border border-white/5'
+                        : actionLoading === `${c.vmid}-stop`
+                        ? 'bg-red-500/20 text-red-400 animate-pulse border border-red-500/20'
+                        : 'bg-surface-700 hover:bg-red-500/20 hover:text-red-400 text-gray-300 border border-white/5 hover:border-red-500/30'
+                    }`}
+                    title="Stop Container"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /></svg>
+                    Stop
+                  </button>
+                </div>
+                
+                <div className="flex w-full md:w-auto flex-1 gap-2">
+                  <button
+                    onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' ? null : {id: c.vmid, view: 'processes'})}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition ${
+                      expandedContainer?.id === c.vmid && expandedContainer.view === 'processes'
+                        ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30 shadow-[0_0_15px_rgba(var(--brand-500),0.15)]'
+                        : 'bg-surface-700 hover:bg-surface-600 text-gray-300 border border-white/5'
+                    }`}
+                  >
+                    {expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        Close
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        Processes
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'resources' ? null : {id: c.vmid, view: 'resources'})}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition ${
+                      expandedContainer?.id === c.vmid && expandedContainer.view === 'resources'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                        : 'bg-surface-700 hover:bg-surface-600 text-gray-300 border border-white/5'
+                    }`}
+                  >
+                    {expandedContainer?.id === c.vmid && expandedContainer.view === 'resources' ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        Close
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                        Resources
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Expandable Process Panel */}
               {expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' && c.status === 'running' && (
-                <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="mt-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
                   <ProcessPanel vmId={vmId} lxcId={c.vmid} />
                 </div>
               )}
               {expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' && c.status !== 'running' && (
-                <div className="mt-4 pt-4 border-t border-white/5 text-center text-gray-500 text-sm py-4">
+                <div className="mt-4 pt-4 border-t border-white/5 text-center text-gray-500 text-sm py-8 animate-in fade-in slide-in-from-top-2 duration-300">
                   Container must be running to view processes.
                 </div>
               )}
 
               {/* Expandable Resource Panel */}
               {expandedContainer?.id === c.vmid && expandedContainer.view === 'resources' && (
-                <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="mt-4 pt-4 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
                   <ResourcePanel vmId={vmId} lxcId={c.vmid} />
                 </div>
               )}
