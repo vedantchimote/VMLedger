@@ -1,0 +1,172 @@
+---
+title: 'Network Topology'
+description: 'Visualize network relationships between VMs, subnets, and gateways'
+icon: 'diagram-project'
+---
+
+## Overview
+
+The Network Topology feature provides a visual map of how your VMs are connected across subnets and gateways. VMLedger automatically discovers network interfaces, routing tables, and ARP neighbors via SSH, then renders an interactive topology diagram on each VM's detail page.
+
+<Info>
+**Real-World Analogy**: Think of network topology like a transit map. Each VM is a "station," subnets are "lines," and gateways are "interchange stations" where different lines connect. The topology view lets you see the entire transit system at a glance.
+</Info>
+
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant UI as Dashboard
+    participant API as FastAPI
+    participant VM as Target VM
+    participant DB as Database
+
+    UI->>API: GET /api/vms/{id}/network/topology
+    API->>DB: Get VM credentials
+    DB-->>API: Encrypted SSH key
+    API->>API: Decrypt credentials
+    API->>VM: SSH: ip addr show
+    VM-->>API: Interface list
+    API->>VM: SSH: ip route show
+    VM-->>API: Routing table
+    API->>VM: SSH: arp -a
+    VM-->>API: ARP neighbors
+    API->>API: Build topology graph
+    API-->>UI: Topology JSON
+    UI->>UI: Render network diagram
+```
+
+## Collected Data
+
+<CardGroup cols={3}>
+  <Card title="Network Interfaces" icon="ethernet">
+    **Command:** `ip addr show`
+    
+    Discovers all network interfaces (eth0, ens3, etc.), their IP addresses, MAC addresses, and link status.
+  </Card>
+  
+  <Card title="Routing Table" icon="route">
+    **Command:** `ip route show`
+    
+    Maps default gateways, subnet routes, and static routes to build the network graph edges.
+  </Card>
+  
+  <Card title="ARP Neighbors" icon="users">
+    **Command:** `arp -a`
+    
+    Identifies other devices on the same subnet, revealing peer VMs and network equipment.
+  </Card>
+</CardGroup>
+
+## API Endpoint
+
+### Get Network Topology
+
+```bash
+curl http://localhost:8000/api/vms/5/network/topology \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "vm_id": 5,
+    "hostname": "hpcie-harbornode",
+    "interfaces": [
+      {
+        "name": "eth0",
+        "ip_address": "10.208.210.56",
+        "mac_address": "bc:24:11:ab:cd:ef",
+        "subnet": "10.208.210.0/24",
+        "status": "UP"
+      }
+    ],
+    "routes": [
+      {
+        "destination": "default",
+        "gateway": "10.208.210.1",
+        "interface": "eth0",
+        "metric": 100
+      },
+      {
+        "destination": "10.208.210.0/24",
+        "gateway": null,
+        "interface": "eth0",
+        "metric": 0
+      }
+    ],
+    "neighbors": [
+      {
+        "ip_address": "10.208.210.1",
+        "mac_address": "00:1a:2b:3c:4d:5e",
+        "interface": "eth0",
+        "state": "REACHABLE"
+      }
+    ]
+  }
+}
+```
+
+## Dashboard Visualization
+
+The Network tab on each VM's detail page renders an interactive topology diagram showing:
+
+- **The VM node** at the center with its hostname and IP
+- **Subnet circles** grouping VMs by network segment
+- **Gateway nodes** showing default routes and next hops
+- **ARP neighbors** as connected nodes on the same subnet
+- **Interface labels** showing which NIC connects to which network
+
+### Topology Node Types
+
+```mermaid
+flowchart TD
+    subgraph "Network Topology"
+        VM["🖥️ hpcie-harbornode<br/>10.208.210.56"]
+        GW["🌐 Gateway<br/>10.208.210.1"]
+        Peer1["📦 Peer VM<br/>10.208.210.70"]
+        Peer2["📦 Peer VM<br/>10.208.210.117"]
+        
+        VM -->|eth0| GW
+        VM ---|same subnet| Peer1
+        VM ---|same subnet| Peer2
+    end
+    
+    style VM fill:#0d9373,color:#fff
+    style GW fill:#3b82f6,color:#fff
+    style Peer1 fill:#6366f1,color:#fff
+    style Peer2 fill:#6366f1,color:#fff
+```
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Troubleshooting Connectivity" icon="magnifying-glass">
+    When a VM can't reach another service, the network topology shows:
+    - Is the gateway reachable?
+    - Are there route entries for the destination subnet?
+    - Are ARP entries stale or missing?
+  </Accordion>
+  
+  <Accordion title="Security Auditing" icon="shield">
+    Review which VMs are on the same subnet and can communicate directly. Identify unexpected network neighbors that may indicate misconfiguration.
+  </Accordion>
+  
+  <Accordion title="Migration Planning" icon="arrows-turn-to-dots">
+    Before migrating a VM, understand its network dependencies — which gateways it uses, which peers it communicates with, and which subnets it belongs to.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="VM Management" icon="server" href="/features/vm-management">
+    Learn how to register and manage VMs
+  </Card>
+  
+  <Card title="Health Monitoring" icon="heart-pulse" href="/features/health-monitoring">
+    Understand how VMLedger monitors VM connectivity
+  </Card>
+</CardGroup>

@@ -42,7 +42,10 @@
               "features/deployment-tracking",
               "features/lxc-containers",
               "features/service-health",
-              "features/log-viewer"
+              "features/log-viewer",
+              "features/uptime-sla",
+              "features/network-topology",
+              "features/process-management"
             ]
           },
           {
@@ -80,7 +83,8 @@
               "api-reference/alerts",
               "api-reference/search",
               "api-reference/lxc",
-              "api-reference/services"
+              "api-reference/services",
+              "api-reference/uptime-network"
             ]
           }
         ]

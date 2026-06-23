@@ -84,6 +84,27 @@ flowchart LR
   >
     Stream real-time journalctl logs via WebSocket in a read-only terminal
   </Card>
+  <Card
+    title="Uptime & SLA"
+    icon="chart-line"
+    href="/features/uptime-sla"
+  >
+    Automated uptime percentage tracking with SLA tier classification and trend charts
+  </Card>
+  <Card
+    title="Network Topology"
+    icon="diagram-project"
+    href="/features/network-topology"
+  >
+    Visualize network interfaces, routes, and ARP neighbors for each VM
+  </Card>
+  <Card
+    title="Process Management"
+    icon="list-check"
+    href="/features/process-management"
+  >
+    Monitor and manage processes running inside LXC containers
+  </Card>
 </CardGroup>
 
 ## Key Features
@@ -144,6 +165,32 @@ flowchart LR
 - Read-only mode — keyboard input silently dropped
 - Color-coded ANSI output via xterm.js
 - Same auth and credential flow as SSH Terminal
+
+### 📈 Uptime & SLA Tracking
+- Automated daily uptime aggregation from health check results
+- SLA tier classification (Five Nines through Below SLA)
+- Color-coded uptime badges on dashboard cards
+- Historical uptime trend charts (7d / 14d / 30d / 90d)
+- Batch fleet-wide uptime summary endpoint
+
+### 🗺️ Network Topology
+- SSH-based discovery of network interfaces, routes, and ARP neighbors
+- Interactive topology visualization in the Network tab
+- Subnet grouping and gateway identification
+- Support for multi-homed VMs with multiple interfaces
+
+### ⚙️ Process Management
+- List all processes inside LXC containers with CPU/memory usage
+- Kill unresponsive container processes from the dashboard
+- Cross-provider support (Proxmox pct, LXD, standard LXC)
+
+### 🎨 Professional Dashboard UI
+- Compact, high-density header with icon-only action buttons
+- 6 view modes: Grid, List, Table, Kanban, Minimal, Analytics
+- Responsive two-column Uptime & DNS card layout
+- Inline System Information strip for zero-scroll data access
+- Optional hostname field with auto-clear on IP removal
+- Dark-mode autofill CSS overrides for all form inputs
 
 ## Technology Stack
 

@@ -102,6 +102,50 @@ icon: 'wrench'
     celery -A vmledger.celery_app beat --loglevel=debug
     ```
   </Accordion>
+  
+  <Accordion title="DNS / Hostname Resolution Failing in Docker">
+    **Error:** `Could not resolve hostname for IP` — works with `nslookup` on host but fails inside the app container.
+    
+    **Cause:** Docker containers default to Google's DNS (`8.8.8.8`) which can't resolve private/internal hostnames.
+    
+    **Solution:** Add your host's DNS servers to the `api` and `celery-worker` services in `docker-compose.yml`:
+    ```yaml
+    services:
+      api:
+        dns:
+          - 10.208.210.1    # Your local DNS
+          - 8.8.8.8         # Fallback
+      celery-worker:
+        dns:
+          - 10.208.210.1
+          - 8.8.8.8
+    ```
+    
+    Then restart:
+    ```bash
+    docker-compose down && docker-compose up -d
+    ```
+  </Accordion>
+  
+  <Accordion title="Browser Autofill Turns Input Backgrounds White">
+    **Symptom:** After selecting an autofill suggestion in Chrome/Edge, form input backgrounds become white, clashing with the dark theme.
+    
+    **Cause:** WebKit browsers apply their own background color to autofilled inputs.
+    
+    **Solution:** Add these CSS overrides to `globals.css`:
+    ```css
+    .input-premium:-webkit-autofill,
+    .input-premium:-webkit-autofill:hover, 
+    .input-premium:-webkit-autofill:focus, 
+    .input-premium:-webkit-autofill:active {
+      -webkit-box-shadow: 0 0 0 30px #111827 inset !important;
+      -webkit-text-fill-color: #f3f4f6 !important;
+      transition: background-color 5000s ease-in-out 0s;
+    }
+    ```
+    
+    This is already applied in VMLedger's `globals.css`.
+  </Accordion>
 </AccordionGroup>
 
 ## Debug Mode

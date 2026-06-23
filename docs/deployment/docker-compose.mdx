@@ -114,6 +114,49 @@ services:
       - api
 ```
 
+## DNS Configuration
+
+<Warning>
+**Important for hostname resolution**: By default, Docker containers use Google's public DNS servers (`8.8.8.8`), which cannot resolve internal/private hostnames. If your VMs use hostnames on a private DNS server, you must pass through your host's DNS configuration.
+</Warning>
+
+Add the `dns` key to the `api` and `celery-worker` services in your `docker-compose.yml`:
+
+```yaml
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    dns:
+      - 10.208.210.1    # Your local DNS server
+      - 8.8.8.8         # Fallback to Google DNS
+    depends_on:
+      - postgres
+      - redis
+  
+  celery-worker:
+    build: .
+    command: celery -A vmledger.celery_app worker
+    dns:
+      - 10.208.210.1    # Same DNS as above
+      - 8.8.8.8
+    depends_on:
+      - postgres
+      - redis
+```
+
+<Tip>
+To find your host's DNS servers, run:
+```bash
+# Linux
+cat /etc/resolv.conf | grep nameserver
+
+# Windows
+ipconfig /all | findstr "DNS Servers"
+```
+</Tip>
+
 ## Updating
 
 ```bash

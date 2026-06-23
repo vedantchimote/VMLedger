@@ -65,13 +65,13 @@ Before registering, collect these details:
 <AccordionGroup>
   <Accordion title="Required Information" icon="circle-check">
     - **IP Address**: IPv4 (e.g., `192.168.1.100`) or IPv6 (e.g., `2001:db8::1`)
-    - **Hostname**: Friendly name (e.g., `web-server-01`)
     - **SSH Port**: Usually `22`, but can be custom (e.g., `2222`)
     - **SSH Credentials**: Either SSH private key OR password
     - **SSH Username**: Usually `root` or your admin user
   </Accordion>
   
   <Accordion title="Optional Information" icon="circle-plus">
+    - **Hostname**: Friendly name (e.g., `web-server-01`). If omitted, defaults to the IP address. Automatically cleared when the IP address field is emptied in the UI.
     - **Domain**: Full domain name (e.g., `web-server-01.example.com`)
     - **Tags**: Categories for organization (e.g., `production`, `web-server`, `nginx`)
     - **Deployment Notes**: Markdown documentation of installed software

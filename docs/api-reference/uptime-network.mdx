@@ -1,0 +1,253 @@
+---
+title: 'Uptime & Network APIs'
+description: 'API endpoints for uptime tracking, SLA summaries, and network topology'
+icon: 'chart-line'
+---
+
+## Uptime Endpoints
+
+### Get VM Uptime Stats
+
+Retrieve computed uptime statistics for a specific VM.
+
+<ParamField path="vm_id" type="integer" required>
+  The ID of the virtual machine.
+</ParamField>
+
+<ParamField query="range" type="string" default="30d">
+  Time range for uptime calculation. Supported values: `7d`, `14d`, `30d`, `90d`.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl http://localhost:8000/api/vms/5/uptime?range=30d \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "http://localhost:8000/api/vms/5/uptime",
+    headers={"Authorization": "Bearer YOUR_TOKEN"},
+    params={"range": "30d"}
+)
+
+data = response.json()
+print(f"Uptime: {data['uptime_percent']}%")
+print(f"SLA Tier: {data['sla_tier']}")
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'http://localhost:8000/api/vms/5/uptime?range=30d',
+  { headers: { 'Authorization': 'Bearer YOUR_TOKEN' } }
+);
+
+const data = await response.json();
+console.log(`Uptime: ${data.uptime_percent}%`);
+```
+
+</CodeGroup>
+
+**Response (200 OK):**
+```json
+{
+  "vm_id": 5,
+  "range": "30d",
+  "uptime_percent": 99.02,
+  "total_checks": 43200,
+  "successful_checks": 42777,
+  "failed_checks": 423,
+  "sla_tier": "basic",
+  "avg_latency_ms": 6.6,
+  "max_latency_ms": 20.0,
+  "daily_breakdown": [
+    {
+      "date": "2026-06-23",
+      "uptime_percent": 100.0,
+      "total_checks": 1440,
+      "successful_checks": 1440,
+      "failed_checks": 0
+    }
+  ]
+}
+```
+
+### Batch Uptime Summary
+
+Retrieve uptime summaries for all VMs owned by the authenticated user. Used by the dashboard to display uptime badges.
+
+<ParamField query="range" type="string" default="30d">
+  Time range for uptime calculation.
+</ParamField>
+
+```bash
+curl http://localhost:8000/api/vms/uptime/summary?range=30d \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response (200 OK):**
+```json
+[
+  {
+    "vm_id": 5,
+    "uptime_percent": 94.64,
+    "sla_tier": "below_sla",
+    "total_checks": 43200,
+    "successful_checks": 40886
+  }
+]
+```
+
+---
+
+## Network Topology Endpoints
+
+### Get Network Topology
+
+Discover the network topology of a specific VM by executing SSH commands to enumerate interfaces, routes, and ARP neighbors.
+
+<ParamField path="vm_id" type="integer" required>
+  The ID of the virtual machine.
+</ParamField>
+
+<CodeGroup>
+
+```bash cURL
+curl http://localhost:8000/api/vms/5/network/topology \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "http://localhost:8000/api/vms/5/network/topology",
+    headers={"Authorization": "Bearer YOUR_TOKEN"}
+)
+
+topology = response.json()["data"]
+for iface in topology["interfaces"]:
+    print(f"{iface['name']}: {iface['ip_address']} ({iface['status']})")
+```
+
+</CodeGroup>
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "vm_id": 5,
+    "hostname": "hpcie-harbornode",
+    "interfaces": [
+      {
+        "name": "eth0",
+        "ip_address": "10.208.210.56",
+        "mac_address": "bc:24:11:ab:cd:ef",
+        "subnet": "10.208.210.0/24",
+        "status": "UP"
+      }
+    ],
+    "routes": [
+      {
+        "destination": "default",
+        "gateway": "10.208.210.1",
+        "interface": "eth0",
+        "metric": 100
+      }
+    ],
+    "neighbors": [
+      {
+        "ip_address": "10.208.210.1",
+        "mac_address": "00:1a:2b:3c:4d:5e",
+        "interface": "eth0",
+        "state": "REACHABLE"
+      }
+    ]
+  }
+}
+```
+
+**Error Response (SSH Failed):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SSH_CONNECTION_FAILED",
+    "message": "Could not establish SSH connection to VM"
+  }
+}
+```
+
+---
+
+## Process Management Endpoints
+
+### List Container Processes
+
+List all running processes inside an LXC container.
+
+<ParamField path="vm_id" type="integer" required>
+  The ID of the host VM.
+</ParamField>
+
+<ParamField path="lxc_id" type="string" required>
+  The LXC container ID or name.
+</ParamField>
+
+```bash
+curl http://localhost:8000/api/vms/5/lxc/101/processes \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "container_id": "101",
+    "processes": [
+      {
+        "pid": 1,
+        "user": "root",
+        "cpu_percent": 0.0,
+        "mem_percent": 0.1,
+        "command": "/sbin/init"
+      }
+    ],
+    "total_count": 42
+  }
+}
+```
+
+### Kill Container Process
+
+Send a kill signal to a specific process inside an LXC container.
+
+<ParamField path="vm_id" type="integer" required>
+  The ID of the host VM.
+</ParamField>
+
+<ParamField path="lxc_id" type="string" required>
+  The LXC container ID or name.
+</ParamField>
+
+<ParamField path="pid" type="integer" required>
+  The process ID to kill.
+</ParamField>
+
+```bash
+curl -X POST http://localhost:8000/api/vms/5/lxc/101/processes/245/kill \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Process 245 killed successfully"
+}
+```
