@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useCreateVM } from "@/lib/hooks/use-vms";
+import { api } from "@/lib/api-client";
 import {
   isValidIPAddress,
   isValidSSHPort,
@@ -40,6 +41,7 @@ export default function NewVMPage() {
   const [tagInput, setTagInput] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isResolving, setIsResolving] = useState(false);
 
   useEffect(() => {
     if (isMounted && !isAuthenticated) {
@@ -71,8 +73,7 @@ export default function NewVMPage() {
         return "";
 
       case "hostname":
-        if (!stringValue) return "Hostname is required";
-        if (!isValidHostname(stringValue))
+        if (stringValue && !isValidHostname(stringValue))
           return "Invalid hostname (max 255 chars, alphanumeric + hyphens)";
         return "";
 
@@ -125,7 +126,15 @@ export default function NewVMPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (name === "ip_address" && value === "") {
+      setFormData((prev) => ({ ...prev, ip_address: value, hostname: "" }));
+      if (touched.hostname) {
+        setErrors((prev) => ({ ...prev, hostname: "" }));
+      }
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
 
     // Validate on change if field was touched
     if (touched[name]) {
@@ -134,13 +143,49 @@ export default function NewVMPage() {
     }
   };
 
-  const handleBlur = (
+  const handleBlur = async (
     e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
     const error = validateField(name, value);
     setErrors((prev) => ({ ...prev, [name]: error }));
+
+    if (name === "ip_address" && !error && !formData.hostname) {
+      try {
+        const result = await api.vms.resolveHostname(value);
+        if (result && result.hostname) {
+          setFormData((prev) => ({ ...prev, hostname: result.hostname }));
+          setTouched((prev) => ({ ...prev, hostname: true }));
+          setErrors((prev) => ({ ...prev, hostname: "" }));
+        }
+      } catch (err) {
+        // Silently ignore resolution failures
+      }
+    }
+  };
+
+  const handleResolveHostname = async () => {
+    if (!formData.ip_address) {
+      alert("Please enter an IP address first.");
+      return;
+    }
+    
+    setIsResolving(true);
+    try {
+      const result = await api.vms.resolveHostname(formData.ip_address);
+      if (result && result.hostname) {
+        setFormData((prev) => ({ ...prev, hostname: result.hostname }));
+        setTouched((prev) => ({ ...prev, hostname: true }));
+        setErrors((prev) => ({ ...prev, hostname: "" }));
+      } else {
+        alert("Could not resolve hostname for this IP.");
+      }
+    } catch (err) {
+      alert("Failed to resolve hostname.");
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   const handleAddTag = () => {
@@ -208,7 +253,7 @@ export default function NewVMPage() {
     // Prepare submission data
     const submitData: VMCreateRequest = {
       ip_address: formData.ip_address,
-      hostname: formData.hostname,
+      hostname: formData.hostname || formData.ip_address,
       domain: formData.domain || undefined,
       ssh_port: Number(formData.ssh_port),
       tags: formData.tags || [],
@@ -340,22 +385,39 @@ export default function NewVMPage() {
                   htmlFor="hostname"
                   className="block text-sm font-semibold text-gray-300 mb-2 uppercase tracking-wide"
                 >
-                  Hostname <span className="text-brand-400">*</span>
+                  Hostname <span className="text-gray-500 font-normal normal-case ml-1">(Optional)</span>
                 </label>
-                <input
-                  type="text"
-                  id="hostname"
-                  name="hostname"
-                  value={formData.hostname}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  className={`input-premium ${
-                    errors.hostname && touched.hostname
-                      ? "border-red-500/50 bg-red-500/5"
-                      : ""
-                  }`}
-                  placeholder="web-server-01"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    id="hostname"
+                    name="hostname"
+                    value={formData.hostname}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    className={`input-premium flex-1 ${
+                      errors.hostname && touched.hostname
+                        ? "border-red-500/50 bg-red-500/5"
+                        : ""
+                    }`}
+                    placeholder="web-server-01"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleResolveHostname}
+                    disabled={isResolving || !formData.ip_address}
+                    className="px-4 py-2 bg-surface-800 hover:bg-surface-700 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 rounded-xl text-brand-400 font-bold tracking-wide transition-colors flex items-center justify-center min-w-[100px]"
+                  >
+                    {isResolving ? (
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      "Resolve"
+                    )}
+                  </button>
+                </div>
                 {errors.hostname && touched.hostname && (
                   <p className="mt-2 text-xs font-medium text-red-400">
                     {errors.hostname}

@@ -48,6 +48,16 @@
     @apply w-full rounded-xl border border-white/10 bg-surface-900/50 px-4 py-3 text-gray-200 backdrop-blur-sm transition-all duration-300 placeholder:text-gray-500 focus:border-brand-500 focus:bg-surface-900/80 focus:outline-none focus:ring-1 focus:ring-brand-500;
   }
   
+  /* Fix Chrome/Webkit autofill styles clashing with dark mode */
+  .input-premium:-webkit-autofill,
+  .input-premium:-webkit-autofill:hover, 
+  .input-premium:-webkit-autofill:focus, 
+  .input-premium:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #111827 inset !important;
+    -webkit-text-fill-color: #f3f4f6 !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+  
   .status-badge-online {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border border-brand-500/30 bg-brand-500/10 text-brand-400 backdrop-blur-md;
   }
