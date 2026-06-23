@@ -1982,9 +1982,7 @@ function ContainersTab({ vmId }: { vmId: number }) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
           {containers.map((c: any) => (
-            <div key={c.vmid} className={`p-5 bg-surface-800/50 border border-white/10 rounded-xl flex flex-col justify-between transition-all ${
-              (expandedContainer?.id === c.vmid) ? 'col-span-full' : ''
-            }`}>
+            <div key={c.vmid} className="p-5 bg-surface-800/50 border border-white/10 rounded-xl flex flex-col justify-between transition-all">
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-bold text-lg text-white truncate pr-2" title={c.name}>
@@ -1999,12 +1997,12 @@ function ContainersTab({ vmId }: { vmId: number }) {
                 </div>
               </div>
               
-              <div className="flex flex-wrap items-center gap-2 pt-4 border-t border-white/5">
-                <div className="flex w-full md:w-auto gap-2">
+              <div className="flex flex-col gap-2 pt-4 border-t border-white/5">
+                <div className="flex w-full gap-2">
                   <button
                     onClick={() => handleAction(c.vmid, 'start')}
                     disabled={c.status === 'running' || actionLoading !== null}
-                    className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded transition ${
                       c.status === 'running'
                         ? 'bg-surface-800 text-gray-600 cursor-not-allowed border border-white/5'
                         : actionLoading === `${c.vmid}-start`
@@ -2019,7 +2017,7 @@ function ContainersTab({ vmId }: { vmId: number }) {
                   <button
                     onClick={() => handleAction(c.vmid, 'restart')}
                     disabled={c.status !== 'running' || actionLoading !== null}
-                    className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded transition ${
                       c.status !== 'running'
                         ? 'bg-surface-800 text-gray-600 cursor-not-allowed border border-white/5'
                         : actionLoading === `${c.vmid}-restart`
@@ -2034,7 +2032,7 @@ function ContainersTab({ vmId }: { vmId: number }) {
                   <button
                     onClick={() => handleAction(c.vmid, 'stop')}
                     disabled={c.status !== 'running' || actionLoading !== null}
-                    className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded transition ${
                       c.status !== 'running'
                         ? 'bg-surface-800 text-gray-600 cursor-not-allowed border border-white/5'
                         : actionLoading === `${c.vmid}-stop`
@@ -2048,7 +2046,7 @@ function ContainersTab({ vmId }: { vmId: number }) {
                   </button>
                 </div>
                 
-                <div className="flex w-full md:w-auto flex-1 gap-2">
+                <div className="flex w-full gap-2">
                   <button
                     onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' ? null : {id: c.vmid, view: 'processes'})}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition ${
