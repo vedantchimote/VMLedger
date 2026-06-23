@@ -111,33 +111,32 @@ curl http://localhost:8000/api/vms/5/network/topology \
 
 ## Dashboard Visualization
 
-The Network tab on each VM's detail page renders an interactive topology diagram showing:
+The Network tab on each VM's detail page renders an advanced, interactive topology diagram built with React Flow. The visualization now includes:
 
-- **The VM node** at the center with its hostname and IP
-- **Subnet circles** grouping VMs by network segment
-- **Gateway nodes** showing default routes and next hops
-- **ARP neighbors** as connected nodes on the same subnet
-- **Interface labels** showing which NIC connects to which network
+- **Immersive Fullscreen Mode:** Pop out the network map into a full-screen view with a blurred dark-mode backdrop (`backdrop-blur-xl`), escaping dashboard layout constraints for maximum screen real estate.
+- **Auto-Centering & Fit View:** The diagram perfectly re-centers and scales to fit your screen automatically when toggling fullscreen.
+- **Custom Dark Theme:** The visualization controls (zoom in/out, fit view) and nodes are deeply integrated with VMLedger's dark theme aesthetics.
+- **Real-Time Indicators:** Containers show live status indicators (running/stopped) and their allocated IPs directly on the node.
 
 ### Topology Node Types
 
 ```mermaid
 flowchart TD
     subgraph "Network Topology"
-        VM["🖥️ hpcie-harbornode<br/>10.208.210.56"]
-        GW["🌐 Gateway<br/>10.208.210.1"]
-        Peer1["📦 Peer VM<br/>10.208.210.70"]
-        Peer2["📦 Peer VM<br/>10.208.210.117"]
+        VM["💻 Host VM<br/>10.208.210.56"]
+        GW["🌉 Bridge / Switch<br/>lxdbr0"]
+        Peer1["📦 Running Container<br/>otp-backend (10.250.95.150)"]
+        Peer2["📦 Stopped Container<br/>reg-sys-db (No IP)"]
         
-        VM -->|eth0| GW
-        VM ---|same subnet| Peer1
-        VM ---|same subnet| Peer2
+        VM --> GW
+        GW --> Peer1
+        GW --> Peer2
     end
     
     style VM fill:#0d9373,color:#fff
-    style GW fill:#3b82f6,color:#fff
-    style Peer1 fill:#6366f1,color:#fff
-    style Peer2 fill:#6366f1,color:#fff
+    style GW fill:#8b5cf6,color:#fff
+    style Peer1 fill:#10b981,color:#fff
+    style Peer2 fill:#6b7280,color:#fff
 ```
 
 ## Use Cases

@@ -1,4 +1,4 @@
-# VMLedger Documentation Coverage Status
+![alt text](<Screenshot (99).png>)# VMLedger Documentation Coverage Status
 
 ## ✅ Completed Documentation (47 pages - 100% COMPLETE! 🎉)
 

@@ -15,6 +15,8 @@ If you run your applications inside **LXC containers** (lightweight Linux contai
 ### What Can You Do?
 
 - **See all containers** running on a host VM — names, IDs, and live status
+- **Real-Time Telemetry** — Live CPU, Memory, and Disk usage via direct SSH probes inside the containers
+- **Process Management** — View running processes with live CPU overlay utilizing `ps` and `top -bn1`
 - **Start, Stop, and Restart** containers with one click
 - **Zero setup** — VMLedger auto-detects your LXC provider
 - **Non-LXC VMs are safe** — they just show a friendly message, no errors
@@ -123,7 +125,15 @@ Each container is shown as a card with:
 | **Title** | Container name (e.g., `nginx-proxy`) |
 | **Badge** | Live status — `RUNNING` (green) or `STOPPED` (gray) |
 | **VMID** | The container's numeric ID (Proxmox) or name (LXD) |
-| **Buttons** | Start, Restart, and Stop controls |
+| **Action Buttons** | Start, Restart, and Stop controls |
+| **Telemetry Panels** | Expandable views for `Processes` and `Resources` metrics |
+
+### Real-Time Telemetry
+
+When you click the **Resources** or **Processes** buttons on a container card, VMLedger fetches live data directly from within the container context via SSH:
+
+- **Resources**: Executes `nproc`, `free -m`, and `df -BG` inside the container to provide accurate CPU core counts, memory usage, and disk space limits.
+- **Processes**: Layers standard `ps aux` enumeration with live CPU percentages mapped from `top -bn1`, ensuring process telemetry isn't skewed by lifetime averages.
 
 ### Step 3: Control Your Containers
 
