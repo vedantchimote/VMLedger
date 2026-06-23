@@ -19,7 +19,11 @@ import {
 } from "recharts";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useVM, useVMSpecs } from "@/lib/hooks/use-vms";
-import { useVMMetrics, useVMPingHistory } from "@/lib/hooks/use-monitoring";
+import { useVMMetrics, useVMPingHistory, useVmUptime } from "@/lib/hooks/use-monitoring";
+import { UptimeBadge } from "@/components/UptimeBadge";
+import { ProcessPanel } from "@/components/ProcessPanel";
+import { ResourcePanel } from "@/components/ResourcePanel";
+import { NetworkTopology } from "@/components/NetworkTopology";
 import {
   useAlertConfig,
   useAlertHistory,
@@ -33,7 +37,7 @@ import {
 } from "@/lib/validation";
 import GlobalNotificationBell from "@/components/GlobalNotificationBell";
 
-type TabType = "overview" | "specs" | "metrics" | "ping" | "notes" | "alerts" | "services" | "containers";
+type TabType = "overview" | "specs" | "metrics" | "ping" | "notes" | "alerts" | "services" | "containers" | "network";
 type TriggerType = "ping" | "dns" | "metrics" | "services";
 
 export default function VMDetailsPage() {
@@ -63,6 +67,7 @@ export default function VMDetailsPage() {
     useAlertConfig(vmId);
   const { data: alertHistory, isLoading: alertHistoryLoading } =
     useAlertHistory(vmId);
+  const { data: uptimeData } = useVmUptime(vmId, "30d");
 
   useEffect(() => {
     if (isMounted && !isAuthenticated) {
@@ -213,42 +218,32 @@ export default function VMDetailsPage() {
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-surface-950/60 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-surface-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-6">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-4 min-w-0">
               <Link
                 href="/dashboard"
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-surface-800 border border-white/5 text-gray-400 hover:text-white hover:bg-surface-700 transition-all hover:scale-105"
+                className="flex items-center justify-center w-9 h-9 rounded-lg bg-surface-800 border border-white/5 text-gray-400 hover:text-white hover:bg-surface-700 transition-all flex-shrink-0"
                 aria-label="Back to Dashboard"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </Link>
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-bold text-white tracking-tight">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-lg font-bold text-white tracking-tight truncate">
                     {vm.hostname}
                   </h1>
                   <span
-                    className={
+                    className={`flex-shrink-0 ${
                       vm.is_reachable === true
                         ? "status-badge-online"
                         : vm.is_reachable === false
                           ? "status-badge-offline"
                           : "status-badge-unknown"
-                    }
+                    }`}
                   >
                     <span
                       className={`w-1.5 h-1.5 rounded-full ${
@@ -262,75 +257,68 @@ export default function VMDetailsPage() {
                     {getStatusText(vm.is_reachable)}
                   </span>
                 </div>
-                <div className="text-sm font-mono text-gray-400">
-                  {vm.ip_address}
-                </div>
+                <div className="text-xs font-mono text-gray-500">{vm.ip_address}</div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => handleTrigger("ping")}
-                disabled={triggerLoading.ping}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20 hover:bg-brand-500/20 hover:border-brand-500/30 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Run an immediate connectivity check"
-              >
-                {triggerLoading.ping ? (
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                )}
-                Ping Now
-              </button>
-              <button
-                onClick={() => handleTrigger("dns")}
-                disabled={triggerLoading.dns}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/30 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Resolve hostname and compare with registered IP"
-              >
-                {triggerLoading.dns ? (
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-                )}
-                DNS Check
-              </button>
-              <button
-                onClick={() => handleTrigger("metrics")}
-                disabled={triggerLoading.metrics}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 hover:border-cyan-500/30 transition-all text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Collect CPU, RAM, and Disk usage via SSH"
-              >
-                {triggerLoading.metrics ? (
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                )}
-                Collect Metrics
-              </button>
-              <div className="w-px h-8 bg-white/10"></div>
-              <GlobalNotificationBell />
-              <Link href={`/vms/${vm.id}/terminal`} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-2 !bg-gray-800 hover:!bg-gray-700 !border-gray-700 text-gray-200">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Trigger Buttons - compact pill group */}
+              <div className="hidden md:flex items-center gap-1.5 bg-surface-900/50 rounded-xl px-1.5 py-1 border border-white/5">
+                <button
+                  onClick={() => handleTrigger("ping")}
+                  disabled={triggerLoading.ping}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-brand-400 hover:bg-brand-500/15 transition-all text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Run an immediate connectivity check"
                 >
+                  {triggerLoading.ping ? (
+                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  )}
+                  Ping
+                </button>
+                <div className="w-px h-4 bg-white/10"></div>
+                <button
+                  onClick={() => handleTrigger("dns")}
+                  disabled={triggerLoading.dns}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-purple-400 hover:bg-purple-500/15 transition-all text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Resolve hostname and compare with registered IP"
+                >
+                  {triggerLoading.dns ? (
+                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                  )}
+                  DNS
+                </button>
+                <div className="w-px h-4 bg-white/10"></div>
+                <button
+                  onClick={() => handleTrigger("metrics")}
+                  disabled={triggerLoading.metrics}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-cyan-400 hover:bg-cyan-500/15 transition-all text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Collect CPU, RAM, and Disk usage via SSH"
+                >
+                  {triggerLoading.metrics ? (
+                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                  )}
+                  Metrics
+                </button>
+              </div>
+              <div className="w-px h-6 bg-white/10 hidden md:block"></div>
+              <GlobalNotificationBell />
+              <Link href={`/vms/${vm.id}/terminal`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-800 border border-white/5 text-gray-300 hover:text-white hover:bg-surface-700 transition-all text-xs font-semibold" title="Open SSH Terminal">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 Terminal
               </Link>
-              <Link href={`/vms/${vm.id}/logs`} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-2 !bg-gray-800 hover:!bg-gray-700 !border-gray-700 text-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-                Live Logs
+              <Link href={`/vms/${vm.id}/logs`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-800 border border-white/5 text-gray-300 hover:text-white hover:bg-surface-700 transition-all text-xs font-semibold" title="View Live Logs">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                Logs
               </Link>
-              <Link href={`/vms/${vm.id}/edit`} className="btn-secondary flex items-center gap-2">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
+              <Link href={`/vms/${vm.id}/edit`} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface-800 border border-white/5 text-gray-300 hover:text-white hover:bg-surface-700 transition-all text-xs font-semibold" title="Edit VM Configuration">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
                 Edit
@@ -386,77 +374,46 @@ export default function VMDetailsPage() {
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 animate-fade-in">
         {/* VM Metadata Section */}
-        <div className="glass-card p-8 mb-8">
-          <h2 className="text-xl font-bold text-white tracking-tight mb-6 flex items-center">
-            <svg
-              className="w-5 h-5 mr-2 text-brand-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
+        <div className="glass-card p-5 mb-5">
+          <h2 className="text-sm font-bold text-white tracking-tight mb-4 flex items-center uppercase">
+            <svg className="w-4 h-4 mr-2 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             System Information
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                Network Interface
-              </p>
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-0.5">IP Address</p>
               <p className="text-white font-mono text-sm">{vm.ip_address}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                SSH Port
-              </p>
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-0.5">SSH Port</p>
               <p className="text-white font-mono text-sm">{vm.ssh_port}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                Domain Name
-              </p>
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-0.5">Domain</p>
               <p className="text-white text-sm">
-                {vm.domain || (
-                  <span className="text-gray-600 italic">Not configured</span>
-                )}
+                {vm.domain || <span className="text-gray-600 italic">—</span>}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                Last Seen
-              </p>
-              <p className="text-white text-sm">
-                {formatRelativeTime(vm.last_seen)}
-              </p>
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-0.5">Last Seen</p>
+              <p className="text-white text-sm">{formatRelativeTime(vm.last_seen)}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                Created
-              </p>
-              <p className="text-white text-sm">
-                {formatRelativeTime(vm.created_at)}
-              </p>
+              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-0.5">Created</p>
+              <p className="text-white text-sm">{formatRelativeTime(vm.created_at)}</p>
             </div>
           </div>
           {vm.tags && vm.tags.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-white/5">
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tags
-                </span>
-                <div className="h-4 w-px bg-white/10 mx-1"></div>
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">Tags</span>
+                <div className="h-3 w-px bg-white/10"></div>
                 {vm.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-brand-500/10 text-brand-300 border border-brand-500/20 rounded-lg text-xs font-semibold tracking-wider uppercase shadow-inner"
-                  >
+                  <span key={index} className="px-2.5 py-0.5 bg-brand-500/10 text-brand-300 border border-brand-500/20 rounded-md text-[10px] font-semibold tracking-wider uppercase">
                     {tag}
                   </span>
                 ))}
@@ -465,104 +422,124 @@ export default function VMDetailsPage() {
           )}
         </div>
 
-        {/* DNS Resolution Status */}
-        <div className="glass-card p-8 mb-8">
-          <h2 className="text-xl font-bold text-white tracking-tight mb-6 flex items-center">
-            <svg
-              className="w-5 h-5 mr-2 text-brand-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-              />
-            </svg>
-            DNS Resolution
-            {vm.dns_mismatch && (
-              <span className="ml-3 px-2.5 py-1 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-lg text-[10px] font-bold uppercase tracking-wider animate-pulse">
-                IP Mismatch Detected
-              </span>
-            )}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Registered IP
-              </p>
-              <p className="text-white font-mono text-sm font-bold">{vm.ip_address}</p>
-            </div>
-            <div className={`rounded-xl p-5 border ${vm.dns_mismatch ? "bg-yellow-500/5 border-yellow-500/20" : "bg-surface-900/50 border-white/5"}`}>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Resolved IP (from hostname)
-              </p>
-              {vm.resolved_ip ? (
-                <p className={`font-mono text-sm font-bold ${vm.dns_mismatch ? "text-yellow-400" : "text-brand-400"}`}>
-                  {vm.resolved_ip}
-                  {vm.dns_mismatch && (
-                    <span className="ml-2 text-yellow-500 text-[10px] font-semibold uppercase">
-                      ≠ registered
-                    </span>
-                  )}
-                  {!vm.dns_mismatch && vm.resolved_ip && (
-                    <span className="ml-2 text-brand-500 text-[10px] font-semibold uppercase">
-                      ✓ matches
-                    </span>
-                  )}
-                </p>
-              ) : (
-                <p className="text-gray-600 italic text-sm">Not yet checked</p>
+        {/* Uptime & DNS - Compact Two-Column */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+          {/* Uptime & SLA */}
+          {uptimeData && (
+            <div className="glass-card p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-bold text-white tracking-tight flex items-center uppercase">
+                  <svg className="w-4 h-4 mr-2 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Uptime & SLA <span className="ml-1.5 text-[10px] text-gray-500 font-normal normal-case">({uptimeData.period})</span>
+                </h2>
+                <UptimeBadge uptimePercent={uptimeData.uptime_percent} slaTier={uptimeData.sla_tier} />
+              </div>
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                <div className="bg-surface-900/50 rounded-lg p-3 border border-white/5">
+                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Checks</p>
+                  <p className="text-white font-mono text-base font-bold">{uptimeData.total_checks.toLocaleString()}</p>
+                </div>
+                <div className="bg-surface-900/50 rounded-lg p-3 border border-white/5">
+                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Failed</p>
+                  <p className={`font-mono text-base font-bold ${uptimeData.failed_checks > 0 ? "text-red-400" : "text-emerald-400"}`}>
+                    {uptimeData.failed_checks.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-surface-900/50 rounded-lg p-3 border border-white/5">
+                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Avg Latency</p>
+                  <p className="text-white font-mono text-base font-bold">
+                    {uptimeData.avg_latency_ms !== null ? `${uptimeData.avg_latency_ms.toFixed(1)}ms` : "N/A"}
+                  </p>
+                </div>
+                <div className="bg-surface-900/50 rounded-lg p-3 border border-white/5">
+                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Max Latency</p>
+                  <p className="text-white font-mono text-base font-bold">
+                    {uptimeData.max_latency_ms !== null ? `${uptimeData.max_latency_ms.toFixed(1)}ms` : "N/A"}
+                  </p>
+                </div>
+              </div>
+              {uptimeData.daily_breakdown.length > 0 && (
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={uptimeData.daily_breakdown}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                      <XAxis dataKey="date" stroke="#9CA3AF" tick={{fill: '#9CA3AF', fontSize: 10}} tickFormatter={(val) => format(new Date(val), 'MMM dd')} />
+                      <YAxis domain={[90, 100]} stroke="#9CA3AF" tick={{fill: '#9CA3AF', fontSize: 10}} width={30} />
+                      <Tooltip contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', color: '#F3F4F6', fontSize: '12px' }} labelFormatter={(val) => format(new Date(val), 'MMM dd, yyyy')} formatter={(val: number) => [`${val.toFixed(2)}%`, 'Uptime']} />
+                      <Line type="monotone" dataKey="uptime_percent" stroke="#10b981" strokeWidth={2} dot={{ r: 2, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               )}
             </div>
-            <div className="bg-surface-900/50 rounded-xl p-5 border border-white/5">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Last DNS Check
-              </p>
-              <p className="text-white text-sm">
-                {vm.dns_last_checked
-                  ? formatRelativeTime(vm.dns_last_checked)
-                  : <span className="text-gray-600 italic">Pending first check</span>
-                }
-              </p>
-              <p className="text-[10px] text-gray-600 mt-1 uppercase tracking-wider">
-                Checked every 6 hours
-              </p>
-            </div>
-          </div>
-          {vm.dns_mismatch && (
-            <div className="mt-4 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl flex items-start gap-3">
-              <svg className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          )}
+
+          {/* DNS Resolution */}
+          <div className="glass-card p-5">
+            <h2 className="text-sm font-bold text-white tracking-tight mb-4 flex items-center uppercase">
+              <svg className="w-4 h-4 mr-2 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
               </svg>
-              <div>
-                <p className="text-sm font-bold text-yellow-400 mb-1">DNS Drift Warning</p>
-                <p className="text-xs text-yellow-400/80">
-                  The hostname <span className="font-mono font-bold">{vm.hostname}</span> now resolves
-                  to <span className="font-mono font-bold">{vm.resolved_ip}</span> instead
-                  of the registered IP <span className="font-mono font-bold">{vm.ip_address}</span>.
-                  Consider updating the VM&apos;s IP address if this change is intentional.
+              DNS Resolution
+              {vm.dns_mismatch && (
+                <span className="ml-2 px-2 py-0.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                  Mismatch
+                </span>
+              )}
+            </h2>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-surface-900/50 rounded-lg p-3 border border-white/5">
+                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Registered IP</p>
+                <p className="text-white font-mono text-sm font-bold">{vm.ip_address}</p>
+              </div>
+              <div className={`rounded-lg p-3 border ${vm.dns_mismatch ? "bg-yellow-500/5 border-yellow-500/20" : "bg-surface-900/50 border-white/5"}`}>
+                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Resolved IP</p>
+                {vm.resolved_ip ? (
+                  <p className={`font-mono text-sm font-bold ${vm.dns_mismatch ? "text-yellow-400" : "text-brand-400"}`}>
+                    {vm.resolved_ip}
+                    {vm.dns_mismatch && <span className="ml-1 text-yellow-500 text-[9px]">≠</span>}
+                    {!vm.dns_mismatch && <span className="ml-1 text-brand-500 text-[9px]">✓</span>}
+                  </p>
+                ) : (
+                  <p className="text-gray-600 italic text-sm">Not checked</p>
+                )}
+              </div>
+              <div className="bg-surface-900/50 rounded-lg p-3 border border-white/5">
+                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Last Check</p>
+                <p className="text-white text-sm">
+                  {vm.dns_last_checked ? formatRelativeTime(vm.dns_last_checked) : <span className="text-gray-600 italic">Pending</span>}
                 </p>
+                <p className="text-[9px] text-gray-600 mt-0.5 uppercase tracking-wider">Every {vm.dns_interval_hours || 6}h</p>
               </div>
             </div>
-          )}
+            {vm.dns_mismatch && (
+              <div className="mt-3 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg flex items-start gap-2">
+                <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <p className="text-xs text-yellow-400/80">
+                  <span className="font-mono font-bold">{vm.hostname}</span> resolves to <span className="font-mono font-bold">{vm.resolved_ip}</span> instead of <span className="font-mono font-bold">{vm.ip_address}</span>.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tabbed Interface */}
         <div className="glass-card overflow-visible">
           {/* Tab Headers */}
-          <div className="border-b border-white/5 bg-surface-900/50">
+          <div className="border-b border-white/5 bg-surface-900/50 rounded-t-2xl">
             <nav className="flex overflow-x-auto hide-scrollbar">
-              {["overview", "specs", "metrics", "ping", "notes", "alerts", "services", "containers"].map((tab) => (
+              {["overview", "specs", "metrics", "ping", "notes", "alerts", "services", "containers", "network"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as TabType)}
-                  className={`px-8 py-5 text-sm font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${
+                  className={`px-5 py-3.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all whitespace-nowrap ${
                     activeTab === tab
                       ? "border-brand-400 text-brand-400 bg-brand-500/5"
-                      : "border-transparent text-gray-400 hover:text-white hover:bg-white/5"
+                      : "border-transparent text-gray-500 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   {tab.replace("_", " ")}
@@ -572,7 +549,7 @@ export default function VMDetailsPage() {
           </div>
 
           {/* Tab Content */}
-          <div className="p-8">
+          <div className="p-6">
             {activeTab === "overview" && (
               <OverviewTab
                 vm={vm}
@@ -609,6 +586,9 @@ export default function VMDetailsPage() {
             )}
             {activeTab === "containers" && (
               <ContainersTab vmId={vmId} />
+            )}
+            {activeTab === "network" && (
+              <NetworkTab vmId={vmId} vm={vm} />
             )}
           </div>
         </div>
@@ -1914,6 +1894,7 @@ function ContainersTab({ vmId }: { vmId: number }) {
   const [lxcData, setLxcData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [expandedContainer, setExpandedContainer] = useState<{id: string, view: 'processes' | 'resources'} | null>(null);
 
   const fetchContainers = useCallback(async () => {
     setIsLoading(true);
@@ -2056,11 +2037,71 @@ function ContainersTab({ vmId }: { vmId: number }) {
                 >
                   Stop
                 </button>
+                <button
+                  onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' ? null : {id: c.vmid, view: 'processes'})}
+                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
+                    expandedContainer?.id === c.vmid && expandedContainer.view === 'processes'
+                      ? 'bg-brand-500/20 text-brand-400 border border-brand-500/20'
+                      : 'bg-surface-700 hover:bg-surface-600 text-gray-300 border border-white/5'
+                  }`}
+                >
+                  Processes
+                </button>
+                <button
+                  onClick={() => setExpandedContainer(expandedContainer?.id === c.vmid && expandedContainer.view === 'resources' ? null : {id: c.vmid, view: 'resources'})}
+                  className={`flex-1 py-2 text-sm font-medium rounded transition ${
+                    expandedContainer?.id === c.vmid && expandedContainer.view === 'resources'
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
+                      : 'bg-surface-700 hover:bg-surface-600 text-gray-300 border border-white/5'
+                  }`}
+                >
+                  Resources
+                </button>
               </div>
+
+              {/* Expandable Process Panel */}
+              {expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' && c.status === 'running' && (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <ProcessPanel vmId={vmId} lxcId={c.vmid} />
+                </div>
+              )}
+              {expandedContainer?.id === c.vmid && expandedContainer.view === 'processes' && c.status !== 'running' && (
+                <div className="mt-4 pt-4 border-t border-white/5 text-center text-gray-500 text-sm py-4">
+                  Container must be running to view processes.
+                </div>
+              )}
+
+              {/* Expandable Resource Panel */}
+              {expandedContainer?.id === c.vmid && expandedContainer.view === 'resources' && (
+                <div className="mt-4 pt-4 border-t border-white/5">
+                  <ResourcePanel vmId={vmId} lxcId={c.vmid} />
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ==========================================
+// Network Tab
+// ==========================================
+
+function NetworkTab({ vmId, vm }: { vmId: number, vm: VM }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white mb-2">Network Topology</h2>
+          <p className="text-gray-400">Visual mapping of the host, bridges, and LXC containers.</p>
+        </div>
+      </div>
+      
+      <div className="relative">
+        <NetworkTopology vmId={vmId} />
+      </div>
     </div>
   );
 }
