@@ -10,6 +10,7 @@ from vmledger.models.metric import Metric
 from vmledger.models.alert import Alert
 from vmledger.models.alert_config import AlertConfig
 from vmledger.models.service_check import ServiceConfig, ServiceStatus
+from vmledger.models.uptime_summary import UptimeDailySummary
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "AlertConfig",
     "ServiceConfig",
     "ServiceStatus",
+    "UptimeDailySummary",
 ]
